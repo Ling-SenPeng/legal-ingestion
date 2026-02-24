@@ -54,9 +54,9 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 5. **The application will:**
    - Find all PDF files in the specified directory (or from config.properties)
-   - Extract text content from each PDF
-   - Display file information and a preview of the content
-   - Track processed files to avoid duplicates on subsequent runs
+   - Extract text content from each PDF by page
+   - Calculate SHA256 hash for deduplication
+   - Store document metadata and page chunks in PostgreSQL
 
 ## Configuration
 
@@ -75,21 +75,6 @@ max.file.size=1048576
 **Alternative (using JAR):**
 - `java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /custom/path`
 
-### Processed Files Tracking
-
-The application automatically tracks which PDF files have been processed to avoid duplicate processing. The tracking information is stored in:
-
-```
-~/.pdf-ingestion/processed_files.txt
-```
-
-Each line contains the full path of a processed PDF file. On subsequent runs, the application will:
-- Load the list of previously processed files
-- Skip any files that have already been processed
-- Only process new PDF files
-
-To reset the tracking (if you want to reprocess all PDFs), simply delete the `~/.pdf-ingestion/processed_files.txt` file.
-
 ## 📋 MVP Level 1 - Page-based Chunking & Database Ingestion
 
 The ingestion pipeline now extracts PDF text by page and stores chunks in PostgreSQL with citation support.
@@ -97,7 +82,8 @@ The ingestion pipeline now extracts PDF text by page and stores chunks in Postgr
 ### Key Features (MVP Level 1)
 
 - ✅ **Page-level extraction**: Extract text from each page separately (1-based page numbering for legal citations)
-- ✅ **SHA256 deduplication**: Calculate file hash to prevent duplicate processing
+- ✅ **SHA256 deduplication**: Calculate file hash to prevent duplicate processing (database-managed)
+- ✅ **Idempotent pipeline**: SHA256 + status tracking ensures no duplicates on re-runs
 - ✅ **Database persistence**: Store document metadata and page chunks in PostgreSQL
 - ✅ **Status tracking**: Track processing pipeline (NEW → PROCESSING → DONE/FAILED)
 - ✅ **Error resilience**: Single PDF failure doesn't halt entire pipeline
@@ -489,9 +475,9 @@ mvn test -DargLine="-Xmx1024m"
 ### PDF Reader
 The `PDFReader` class provides utilities to:
 - **Find all PDF files** in a given directory (including subdirectories)
-- **Extract text** from PDF files
+- **Extract text by page** from PDF files using PDFBox (1-based page numbering)
 - **Get PDF information** including file path, text length, and content preview
-- **Track processed files** to avoid duplicate processing
+- **Validate file size** to skip files exceeding 1MB threshold
 
 ### Processed Files Tracking
 - Automatically tracks processed PDF files in `~/.pdf-ingestion/processed_files.txt`

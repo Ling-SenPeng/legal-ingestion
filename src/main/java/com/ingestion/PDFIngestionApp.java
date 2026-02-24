@@ -2,48 +2,149 @@ package com.ingestion;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 
 /**
- * Main application to read and process PDF files from a directory.
+ * Main application to ingest PDF files: extract text by page, calculate SHA256,
+ * and persist to PostgreSQL database with page-level chunking (citation-aware).
+ *
+ * Usage:
+ *   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+ *   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" \
+ *       -Dexec.args="/path/to/pdfs jdbc:postgresql://localhost:5432/db user pass"
  */
 public class PDFIngestionApp {
 
 	private static final String CONFIG_FILE = "config.properties";
 	private static final String DEFAULT_DIRECTORY = "/Users/ling-senpeng/Documents/divorce 2026";
+	private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/legal_ingestion";
+	private static final String DEFAULT_DB_USER = "ingestion_user";
+	private static final String DEFAULT_DB_PASSWORD = "ingestion_pass";
 
 	public static void main(String[] args) {
-		String directoryPath = (args.length > 0) ? args[0] : loadDirectoryFromConfig();
+		// Parse command-line arguments or load from config
+		String directoryPath = DEFAULT_DIRECTORY;
+		String dbUrl = DEFAULT_DB_URL;
+		String dbUser = DEFAULT_DB_USER;
+		String dbPassword = DEFAULT_DB_PASSWORD;
+
+		if (args.length > 0) {
+			directoryPath = args[0];
+		}
+		if (args.length > 1) {
+			dbUrl = args[1];
+		}
+		if (args.length > 2) {
+			dbUser = args[2];
+		}
+		if (args.length > 3) {
+			dbPassword = args[3];
+		}
+
+		// Try to load from config if not provided via args
+		Properties props = loadConfig();
+		if (props != null) {
+			if (args.length == 0) {
+				directoryPath = props.getProperty("pdf.ingestion.directory", directoryPath);
+			}
+			dbUrl = props.getProperty("db.url", dbUrl);
+			dbUser = props.getProperty("db.user", dbUser);
+			dbPassword = props.getProperty("db.password", dbPassword);
+		}
+
+		System.out.println("=== PDF Ingestion Pipeline (MVP Level 1) ===");
+		System.out.println("Input Directory: " + directoryPath);
+		System.out.println("Database URL: " + dbUrl);
+		System.out.println();
+
 		PDFReader pdfReader = new PDFReader();
+		DocumentRepo documentRepo = new DocumentRepo(dbUrl, dbUser, dbPassword);
+		ChunkRepo chunkRepo = new ChunkRepo(dbUrl, dbUser, dbPassword);
 
 		try {
-			System.out.println("Reading PDF files from: " + directoryPath);
-			List<PDFReader.PDFInfo> pdfInfoList = pdfReader.readAllPdfsFromDirectory(directoryPath);
+			// Discover all PDF files
+			List<Path> pdfFiles = pdfReader.findPDFFiles(directoryPath);
+			System.out.println("Found " + pdfFiles.size() + " PDF file(s) in " + directoryPath);
+			System.out.println();
 
-			if (pdfInfoList.isEmpty()) {
-				System.out.println("No new PDF files found in the directory.");
+			if (pdfFiles.isEmpty()) {
+				System.out.println("No PDF files found.");
 				return;
 			}
 
-			System.out.println("\nFound " + pdfInfoList.size() + " new PDF file(s) smaller than 1MB:\n");
-			for (int i = 0; i < pdfInfoList.size(); i++) {
-				PDFReader.PDFInfo info = pdfInfoList.get(i);
-				System.out.println("--- PDF #" + (i + 1) + " ---");
-				System.out.println("File Name: " + info.fileName);
-				System.out.println("File Path: " + info.filePath);
-				System.out.println("File Size: " + formatFileSize(info.fileSize));
-				System.out.println("Text Length: " + info.textLength + " characters");
-				System.out.println("Preview: " + truncateText(info.preview, 80));
-				System.out.println();
+			// Filter files > 1MB and process each
+			int processedCount = 0;
+			int skippedCount = 0;
+			int failedCount = 0;
 
-				// Mark file as processed
+			for (Path pdfPath : pdfFiles) {
+				String filePath = pdfPath.toString();
+				String fileName = pdfPath.getFileName().toString();
+				long fileSize = Files.size(pdfPath);
+
+				System.out.println("[" + (processedCount + skippedCount + failedCount + 1) + "] Processing: " + fileName);
+
 				try {
-					pdfReader.saveProcessedFile(info.filePath);
-				} catch (IOException e) {
-					System.err.println("Warning: Could not save processed file marker for " + info.fileName + ": " + e.getMessage());
+					// Check file size
+					long maxFileSize = loadMaxFileSize(props);
+					if (fileSize > maxFileSize) {
+						System.out.println("  ⊘ Skipped: file size (" + formatFileSize(fileSize) + ") > limit (" + formatFileSize(maxFileSize) + ")");
+						skippedCount++;
+						continue;
+					}
+
+					// Calculate SHA256 hash
+					System.out.println("  • Computing SHA256...");
+					String sha256 = Sha256Hasher.computeHash(filePath);
+
+					// Upsert document and get ID
+					System.out.println("  • Upserting document record...");
+					long docId = documentRepo.upsertAndGetId(fileName, filePath, sha256, fileSize);
+					System.out.println("  • Document ID: " + docId);
+
+					// Extract pages
+					System.out.println("  • Extracting text by page...");
+					List<PDFReader.PageText> pages = pdfReader.extractPages(filePath);
+					System.out.println("  • Pages extracted: " + pages.size());
+
+					// Insert chunks with citations
+					System.out.println("  • Storing chunks with page citations...");
+					chunkRepo.insertPageChunks(docId, pages);
+
+					// Mark as done
+					documentRepo.markDone(docId);
+					System.out.println("  ✓ Success: " + pages.size() + " page(s) ingested");
+					processedCount++;
+
+				} catch (Exception e) {
+					System.err.println("  ✗ Error: " + e.getMessage());
+					e.printStackTrace();
+					
+					// Try to mark as failed in database
+					try {
+						long docId = documentRepo.upsertAndGetId(fileName, filePath, 
+							Sha256Hasher.computeHash(filePath), fileSize);
+						documentRepo.markFailed(docId, e.getMessage());
+					} catch (Exception ex) {
+						System.err.println("  ⚠ Could not mark document as failed in database: " + ex.getMessage());
+					}
+					
+					failedCount++;
 				}
+
+				System.out.println();
 			}
+
+			// Summary
+			System.out.println("=== Summary ===");
+			System.out.println("Total files processed: " + processedCount);
+			System.out.println("Total files skipped: " + skippedCount);
+			System.out.println("Total files failed: " + failedCount);
+			System.out.println("Total files encountered: " + pdfFiles.size());
 
 		} catch (IOException e) {
 			System.err.println("Error reading PDFs: " + e.getMessage());
@@ -53,44 +154,40 @@ public class PDFIngestionApp {
 	}
 
 	/**
-	 * Load the PDF directory from the config.properties file.
-	 *
-	 * @return the directory path from config, or default if not found
+	 * Load configuration from config.properties.
 	 */
-	private static String loadDirectoryFromConfig() {
+	private static Properties loadConfig() {
 		Properties properties = new Properties();
 		try (InputStream input = PDFIngestionApp.class.getClassLoader().getResourceAsStream(CONFIG_FILE)) {
-			if (input == null) {
-				System.out.println("Warning: " + CONFIG_FILE + " not found. Using default directory.");
-				return DEFAULT_DIRECTORY;
-			}
-			properties.load(input);
-			String directory = properties.getProperty("pdf.ingestion.directory");
-			if (directory != null && !directory.trim().isEmpty()) {
-				return directory;
+			if (input != null) {
+				properties.load(input);
+				return properties;
 			}
 		} catch (IOException e) {
-			System.err.println("Error loading config file: " + e.getMessage());
+			System.out.println("Warning: Could not load config.properties: " + e.getMessage());
 		}
-		System.out.println("Using default directory from fallback.");
-		return DEFAULT_DIRECTORY;
+		return null;
 	}
 
 	/**
-	 * Truncate text to a maximum length and add ellipsis if truncated.
+	 * Load maximum file size from config or return default.
 	 */
-	private static String truncateText(String text, int maxLength) {
-		if (text.length() > maxLength) {
-			return text.substring(0, maxLength) + "...";
+	private static long loadMaxFileSize(Properties props) {
+		if (props != null) {
+			String maxSizeStr = props.getProperty("max.file.size");
+			if (maxSizeStr != null && !maxSizeStr.trim().isEmpty()) {
+				try {
+					return Long.parseLong(maxSizeStr);
+				} catch (NumberFormatException e) {
+					System.out.println("Warning: Invalid max.file.size: " + maxSizeStr);
+				}
+			}
 		}
-		return text;
+		return 1024 * 1024;  // 1MB default
 	}
 
 	/**
-	 * Format file size in human-readable format (B, KB, MB, GB).
-	 *
-	 * @param bytes the file size in bytes
-	 * @return formatted file size string
+	 * Format file size in human-readable format.
 	 */
 	private static String formatFileSize(long bytes) {
 		if (bytes <= 0) return "0 B";

@@ -218,6 +218,41 @@ public class PDFReader {
 	}
 
 	/**
+	 * Extract text from each page of a PDF file.
+	 *
+	 * @param pdfFilePath the path to the PDF file
+	 * @return a list of PageText objects, one per page (1-based page numbering)
+	 * @throws IOException if an error occurs while reading the PDF
+	 */
+	public List<PageText> extractPages(String pdfFilePath) throws IOException {
+		List<PageText> pages = new ArrayList<>();
+		try (PDDocument document = PDDocument.load(new File(pdfFilePath))) {
+			int pageCount = document.getNumberOfPages();
+			
+			for (int pageNum = 1; pageNum <= pageCount; pageNum++) {
+				try {
+					PDFTextStripper stripper = new PDFTextStripper();
+					stripper.setStartPage(pageNum);
+					stripper.setEndPage(pageNum);
+					String pageText = stripper.getText(document);
+					
+					// Treat null or empty text as empty string
+					if (pageText == null) {
+						pageText = "";
+					}
+					
+					pages.add(new PageText(pageNum, pageText));
+				} catch (Exception e) {
+					// If we fail to extract a page, add empty text for that page
+					System.err.println("Warning: Failed to extract text from page " + pageNum + " of " + pdfFilePath + ": " + e.getMessage());
+					pages.add(new PageText(pageNum, ""));
+				}
+			}
+		}
+		return pages;
+	}
+
+	/**
 	 * A simple data class to hold PDF information.
 	 */
 	public static class PDFInfo {
@@ -243,6 +278,27 @@ public class PDFReader {
 				", textLength=" + textLength +
 				", fileSize=" + fileSize +
 				", preview='" + preview + '\'' +
+				'}';
+		}
+	}
+
+	/**
+	 * Data class to hold a page's text with citation (1-based page number).
+	 */
+	public static class PageText {
+		public final int pageNo;  // 1-based page number for legal citation
+		public final String text;
+
+		public PageText(int pageNo, String text) {
+			this.pageNo = pageNo;
+			this.text = text != null ? text : "";
+		}
+
+		@Override
+		public String toString() {
+			return "PageText{" +
+				"pageNo=" + pageNo +
+				", textLength=" + text.length() +
 				'}';
 		}
 	}

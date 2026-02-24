@@ -90,7 +90,203 @@ Each line contains the full path of a processed PDF file. On subsequent runs, th
 
 To reset the tracking (if you want to reprocess all PDFs), simply delete the `~/.pdf-ingestion/processed_files.txt` file.
 
-## PostgreSQL Database Setup (Docker)
+## 📋 MVP Level 1 - Page-based Chunking & Database Ingestion
+
+The ingestion pipeline now extracts PDF text by page and stores chunks in PostgreSQL with citation support.
+
+### Key Features (MVP Level 1)
+
+- ✅ **Page-level extraction**: Extract text from each page separately (1-based page numbering for legal citations)
+- ✅ **SHA256 deduplication**: Calculate file hash to prevent duplicate processing
+- ✅ **Database persistence**: Store document metadata and page chunks in PostgreSQL
+- ✅ **Status tracking**: Track processing pipeline (NEW → PROCESSING → DONE/FAILED)
+- ✅ **Error resilience**: Single PDF failure doesn't halt entire pipeline
+- ✅ **Metadata storage**: JSONB metadata per chunk (extractor type, character count)
+- ⏳ **Embeddings**: NULL for MVP (ready for future OpenAI integration)
+
+### Run the Ingestion Pipeline
+
+#### 1. Ensure PostgreSQL is running (Docker):
+
+```bash
+# Start PostgreSQL with pgvector
+docker-compose up -d
+
+# Initialize database schema
+docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
+
+# Verify tables are created
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c "\dt"
+```
+
+Expected output:
+```
+               List of relations
+ Schema |      Name      | Type  |       Owner       
+--------+----------------+-------+-------------------
+ public | pdf_chunks     | table | ingestion_user
+ public | pdf_documents  | table | ingestion_user
+```
+
+#### 2. Run the ingestion app:
+
+**Using Maven (default config.properties directory):**
+```bash
+mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+```
+
+**Using Maven (custom directory and database):**
+```bash
+mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" \
+  -Dexec.args="/path/to/pdfs jdbc:postgresql://localhost:5432/legal_ingestion ingestion_user ingestion_pass"
+```
+
+**Using compiled JAR:**
+```bash
+mvn clean package
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+```
+
+#### 3. Expected output:
+
+```
+=== PDF Ingestion Pipeline (MVP Level 1) ===
+Input Directory: /Users/ling-senpeng/Documents/divorce 2026
+Database URL: jdbc:postgresql://localhost:5432/legal_ingestion
+
+Found 33 PDF file(s) in /Users/ling-senpeng/Documents/divorce 2026
+
+[1] Processing: document1.pdf
+  • Computing SHA256...
+  • Upserting document record...
+  • Document ID: 1
+  • Extracting text by page...
+  • Pages extracted: 5
+  • Storing chunks with page citations...
+  Inserted/updated 5 chunks
+  ✓ Success: 5 page(s) ingested
+
+[2] Processing: document2.pdf
+...
+
+=== Summary ===
+Total files processed: 33
+Total files skipped: 0
+Total files failed: 0
+Total files encountered: 33
+```
+
+### Verify Results in Database
+
+After running the ingestion pipeline, verify the results:
+
+#### Check documents were stored:
+
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+  "SELECT id, file_name, sha256, status FROM pdf_documents LIMIT 5;"
+```
+
+Expected output:
+```
+ id |      file_name      |                              sha256                             | status  
+----+---------------------+--------------------------------+--------
+  1 | document1.pdf       | 3a5f2b8c1d9e4f7a2b8c1d9e4f7a2b8c1d9e4f7a2b8c1d9e4f7a2b8c1d9e | DONE
+  2 | document2.pdf       | 2b4e1c7d8f9a3b6c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2 | DONE
+  3 | document3.pdf       | 5c7f2a9d8e1b6c3f4a7d2e9b1c8f5a2d3e0f1b2c4d7e9f1a3b6c8d0e2 | DONE
+```
+
+#### Check chunks by document ID (with page numbers):
+
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+  "SELECT id, page_no, chunk_index, LENGTH(text) as char_count, meta FROM pdf_chunks WHERE doc_id = 1 ORDER BY page_no;"
+```
+
+Expected output:
+```
+ id | page_no | chunk_index | char_count |                    meta                     
+----+---------+-------------+------------+---------------------------------------------
+  1 |       1 |           0 |       1523 | {"char_count": 1523, "extractor": "pdfbox"}
+  2 |       2 |           0 |       2018 | {"char_count": 2018, "extractor": "pdfbox"}
+  3 |       3 |           0 |       1876 | {"char_count": 1876, "extractor": "pdfbox"}
+  4 |       4 |           0 |       1645 | {"char_count": 1645, "extractor": "pdfbox"}
+  5 |       5 |           0 |       1234 | {"char_count": 1234, "extractor": "pdfbox"}
+```
+
+#### Count total chunks:
+
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+  "SELECT COUNT(*) as total_chunks FROM pdf_chunks;"
+```
+
+#### Get a specific page chunk for legal citation:
+
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+  "SELECT id, page_no, LEFT(text, 100) as preview FROM pdf_chunks WHERE doc_id = 1 AND page_no = 3;"
+```
+
+Expected output:
+```
+ id | page_no |                             preview                              
+----+---------+--------------------------------------------------------------------
+  3 |       3 | This is the text content from page 3 of the document. It contains...
+```
+
+#### Idempotency check (run ingestion twice):
+
+First run processes new files, second run checks for duplicates:
+
+```bash
+# First run
+mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+
+# Second run
+mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+
+# Check if documents are marked as existing
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+  "SELECT COUNT(*) FROM pdf_documents WHERE status = 'DONE';"
+```
+
+The second run should skip processing (or upsert existing chunks without duplicating).
+
+### Pagination & Status Filtering
+
+#### Get all documents by status:
+
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+  "SELECT id, file_name, file_size, status FROM pdf_documents WHERE status = 'DONE' ORDER BY processed_at DESC LIMIT 10;"
+```
+
+#### Get failed documents with error messages:
+
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+  "SELECT id, file_name, status, error_msg FROM pdf_documents WHERE status = 'FAILED';"
+```
+
+### Document and Schema
+
+The ingestion pipeline performs these operations:
+
+1. Discover all PDF files in input directory (filter > 1MB)
+2. Calculate SHA256 hash of each PDF
+3. Upsert document record in `pdf_documents` table
+4. Extract text by page using PDFBox (`PDFTextStripper` with setStartPage/setEndPage)
+5. Store each page as a chunk in `pdf_chunks` table with:
+   - `page_no` (1-based for legal citation)
+   - `chunk_index` = 0 for MVP (future: multiple chunks per page)
+   - `text` (page content)
+   - `meta` JSON including extractor type and character count
+   - `embedding` (NULL for MVP, ready for OpenAI integration)
+6. Mark document as DONE or FAILED
+7. Continue with next file (no early exit on failure)
+
+
 
 This application can store extracted PDF content in a PostgreSQL database.
 

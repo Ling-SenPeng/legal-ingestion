@@ -175,25 +175,35 @@ docker-compose down -v  # -v removes volumes; omit to keep data
 
 ### Database Schema
 
-The database schema (pgvector extension, tables, and indexes) is defined in `init.sql`. 
+The database schema (pgvector extension, tables, and indexes) is defined in `init.sql`.
 
-The table `pdf_documents` stores:
+**pdf_documents table** - Stores PDF file metadata:
 - `id` - Unique identifier
 - `file_name` - PDF file name
-- `file_path` - Full path to the file (unique constraint)
+- `file_path` - Full path to the file
+- `sha256` - SHA256 hash of file content (unique, used for deduplication)
 - `file_size` - Size in bytes
-- `text_content` - Extracted text content from the PDF
-- `preview` - Short preview of the content
+- `status` - Processing status: NEW, PROCESSING, COMPLETED, FAILED
+- `created_at` - Timestamp when record was created
+- `processed_at` - Timestamp when file was processed
+
+**pdf_chunks table** - Stores text chunks/pages from PDFs with embeddings:
+- `id` - Unique identifier
+- `doc_id` - Foreign key to pdf_documents
+- `page_no` - Page or section number
+- `text` - Extracted text content
 - `embedding` - Vector embeddings (1536 dimensions) for semantic search
-- `processed_at` - Timestamp when the file was processed
-- `created_at` - Timestamp when the record was created
+- `meta` - JSON metadata (can store custom information)
+- `created_at` - Timestamp when chunk was created
 
 **Indexes:**
 - `idx_file_path` - For fast file path lookups
+- `idx_sha256` - For file deduplication
+- `idx_status` - For filtering by processing status
 - `idx_processed_at` - For sorting by processing date
-- `idx_embedding` - IVFFLAT index for vector similarity search
-
-**Note:** The `embedding` column stores 1536-dimensional vectors (suitable for OpenAI embeddings). Adjust the dimension based on your embedding model.
+- `idx_doc_id` - For linking chunks to documents
+- `idx_page_no` - For page-based queries
+- `idx_chunk_embedding` - IVFFLAT index for vector similarity search
 
 ### Database Connection Configuration
 

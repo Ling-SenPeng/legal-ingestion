@@ -42,13 +42,15 @@ class PDFReaderTest {
 			"test.pdf",
 			"/path/to/test.pdf",
 			100,
-			"This is a preview"
+			"This is a preview",
+			512000
 		);
 
 		assertNotNull(info.toString());
 		assertTrue(info.toString().contains("test.pdf"));
 		assertEquals("test.pdf", info.fileName);
 		assertEquals(100, info.textLength);
+		assertEquals(512000, info.fileSize);
 	}
 
 	@Test

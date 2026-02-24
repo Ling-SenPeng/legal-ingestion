@@ -49,16 +49,32 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 ## Configuration
 
-The application reads the PDF directory from `src/main/resources/config.properties`:
+The application reads the PDF directory and file size limits from `src/main/resources/config.properties`:
 
 ```properties
 pdf.ingestion.directory=/Users/ling-senpeng/Documents/divorce 2026
+max.file.size=1048576
 ```
 
 **Priority order for directory selection:**
 1. Command-line argument: `java -jar legal-ingestion-0.0.1-SNAPSHOT.jar /custom/path`
 2. Config file: `config.properties` (built into the JAR)
 3. Fallback default: Hardcoded in the code
+
+### Processed Files Tracking
+
+The application automatically tracks which PDF files have been processed to avoid duplicate processing. The tracking information is stored in:
+
+```
+~/.pdf-ingestion/processed_files.txt
+```
+
+Each line contains the full path of a processed PDF file. On subsequent runs, the application will:
+- Load the list of previously processed files
+- Skip any files that have already been processed
+- Only process new PDF files
+
+To reset the tracking (if you want to reprocess all PDFs), simply delete the `~/.pdf-ingestion/processed_files.txt` file.
 
 ## Project Structure
 
@@ -103,11 +119,13 @@ mvn compile
 **Run Application**
 ```bash
 # Using default config.properties directory
-mvn exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
 
 # Using custom directory
-mvn exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/path/to/pdfs"
+mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/path/to/pdfs"
 ```
+
+**Note:** The `mvn compile` phase is required before `exec:java` to ensure the classes are compiled and available.
 
 **Run Tests with Coverage**
 ```bash

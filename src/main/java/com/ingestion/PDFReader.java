@@ -6,32 +6,24 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 /**
  * A utility class to read and extract text from PDF files in a directory.
+ * State is now managed by the database (SHA256 deduplication, status tracking).
  */
 public class PDFReader {
 
 	private static final String CONFIG_FILE = "config.properties";
 	private static final long DEFAULT_MAX_FILE_SIZE = 1024 * 1024; // 1 MB fallback
 	private static final long MAX_FILE_SIZE = loadMaxFileSize();
-	private static final String DATA_DIR = System.getProperty("user.home") + File.separator + ".pdf-ingestion";
-	private static final String PROCESSED_FILES = DATA_DIR + File.separator + "processed_files.txt";
-	private Set<String> processedFiles;
 
 	public PDFReader() {
-		this.processedFiles = new HashSet<>();
-		loadProcessedFiles();
 	}
 
 	/**
@@ -62,57 +54,6 @@ public class PDFReader {
 		}
 		System.out.println("Using default max file size: " + formatFileSize(DEFAULT_MAX_FILE_SIZE));
 		return DEFAULT_MAX_FILE_SIZE;
-	}
-
-	/**
-	 * Load the list of processed files from the tracking file.
-	 */
-	private void loadProcessedFiles() {
-		try {
-			Path processedFilePath = Paths.get(PROCESSED_FILES);
-			if (Files.exists(processedFilePath)) {
-				List<String> lines = Files.readAllLines(processedFilePath, StandardCharsets.UTF_8);
-				processedFiles.addAll(lines);
-				System.out.println("Loaded " + processedFiles.size() + " previously processed file(s).");
-			}
-		} catch (IOException e) {
-			System.err.println("Error loading processed files list: " + e.getMessage());
-		}
-	}
-
-	/**
-	 * Check if a PDF file has already been processed.
-	 *
-	 * @param filePath the full path to the PDF file
-	 * @return true if the file has been processed, false otherwise
-	 */
-	public boolean isProcessed(String filePath) {
-		return processedFiles.contains(filePath);
-	}
-
-	/**
-	 * Mark a PDF file as processed by saving its path to the tracking file.
-	 *
-	 * @param filePath the full path to the PDF file
-	 * @throws IOException if an error occurs while writing to the tracking file
-	 */
-	public void saveProcessedFile(String filePath) throws IOException {
-		if (!processedFiles.contains(filePath)) {
-			// Create data directory if it doesn't exist
-			Path dataDirPath = Paths.get(DATA_DIR);
-			if (!Files.exists(dataDirPath)) {
-				Files.createDirectories(dataDirPath);
-			}
-
-			// Append the file path to the tracking file
-			Files.write(
-				Paths.get(PROCESSED_FILES),
-				(filePath + System.lineSeparator()).getBytes(StandardCharsets.UTF_8),
-				StandardOpenOption.CREATE,
-				StandardOpenOption.APPEND
-			);
-			processedFiles.add(filePath);
-		}
 	}
 
 	/**
@@ -154,7 +95,7 @@ public class PDFReader {
 
 	/**
 	 * Extracts text and basic information from all PDF files in a directory.
-	 * Only processes files smaller than 1MB that have not been processed before.
+	 * Only processes files smaller than 1MB.
 	 *
 	 * @param directoryPath the path to the directory
 	 * @return a list of PDF information objects
@@ -168,12 +109,6 @@ public class PDFReader {
 			try {
 				String filePath = pdfFile.toString();
 				long fileSize = Files.size(pdfFile);
-				
-				// Skip if already processed
-				if (isProcessed(filePath)) {
-					System.out.println("Skipping already processed file: " + pdfFile.getFileName());
-					continue;
-				}
 				
 				if (fileSize > MAX_FILE_SIZE) {
 					System.out.println("Skipping file (size > 1MB): " + pdfFile.getFileName() + " (" + formatFileSize(fileSize) + ")");

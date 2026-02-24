@@ -25,6 +25,11 @@
 			<version>42.7.3</version>
 		</dependency>
 		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>2.16.1</version>
+		</dependency>
+		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter</artifactId>
 			<version>5.10.0</version>
@@ -50,7 +55,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>com.ingestion.PDFIngestionApp</mainClass>
+							<mainClass>com.ingestion.AppMain</mainClass>
 						</manifest>
 					</archive>
 					<descriptorRefs>

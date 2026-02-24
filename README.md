@@ -113,6 +113,11 @@ This project includes a `docker-compose.yml` file for running PostgreSQL with pg
 docker-compose up -d
 ```
 
+**Initialize the database with schema:**
+```bash
+docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
+```
+
 **Stop the database:**
 ```bash
 docker-compose down
@@ -125,44 +130,29 @@ docker-compose logs postgres
 
 ### Initialize Database with pgvector
 
-The database schema is defined in `init.sql`. You can initialize the database using one of these methods:
+The database will automatically initialize on first startup with the `init.sql` schema (since the volume mount is enabled in `docker-compose.yml`).
 
-**Option 1: Automatic initialization (Recommended)**
+If you need to manually initialize or re-initialize the database:
 
-Update `docker-compose.yml` to uncomment the init.sql volume mount:
-
-```yaml
-volumes:
-  - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-  - postgres_data:/var/lib/postgresql/data
-```
-
-Then start the container:
-```bash
-docker-compose down
-docker-compose up -d
-```
-
-PostgreSQL will automatically run `init.sql` on first startup.
-
-**Option 2: Docker exec with init.sql**
+**Simple command:**
 ```bash
 docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
 ```
 
-**Option 3: Interactive psql connection**
-```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion
+**Alternative methods:**
 
-# Then paste the contents of init.sql manually
-```
+1. **Using psql interactively:**
+   ```bash
+   docker-compose exec postgres psql -U ingestion_user -d legal_ingestion
+   # Then paste or run the contents of init.sql
+   ```
 
-**Option 4: Using docker exec with heredoc**
-```bash
-docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion << EOF
-$(cat init.sql)
-EOF
-```
+2. **Using heredoc:**
+   ```bash
+   docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion << EOF
+   $(cat init.sql)
+   EOF
+   ```
 
 ### Verify Docker Setup
 

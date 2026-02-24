@@ -5,12 +5,19 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.List;
 import java.util.Properties;
 
 /**
  * Main application to ingest PDF files: extract text by page, calculate SHA256,
  * and persist to PostgreSQL database with page-level chunking (citation-aware).
+ *
+ * MVP Level 1 optimizations:
+ * - Single UPSERT SQL for document insertion/update
+ * - Minimal database connections (one per PDF)
+ * - Error-aware: reuse SHA256 hash, no redundant calculations
  *
  * Usage:
  *   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
@@ -56,14 +63,15 @@ public class PDFIngestionApp {
 			dbPassword = props.getProperty("db.password", dbPassword);
 		}
 
+		// Ensure database driver is loaded
+		DocumentRepo.ensureDriverLoaded();
+
 		System.out.println("=== PDF Ingestion Pipeline (MVP Level 1) ===");
 		System.out.println("Input Directory: " + directoryPath);
 		System.out.println("Database URL: " + dbUrl);
 		System.out.println();
 
 		PDFReader pdfReader = new PDFReader();
-		DocumentRepo documentRepo = new DocumentRepo(dbUrl, dbUser, dbPassword);
-		ChunkRepo chunkRepo = new ChunkRepo(dbUrl, dbUser, dbPassword);
 
 		try {
 			// Discover all PDF files
@@ -88,8 +96,12 @@ public class PDFIngestionApp {
 
 				System.out.println("[" + (processedCount + skippedCount + failedCount + 1) + "] Processing: " + fileName);
 
+				// Calculate sha256 once per PDF
+				String sha256 = null;
+				long docId = -1;
+
 				try {
-					// Check file size
+					// Check file size first (no I/O yet)
 					long maxFileSize = loadMaxFileSize(props);
 					if (fileSize > maxFileSize) {
 						System.out.println("  ⊘ Skipped: file size (" + formatFileSize(fileSize) + ") > limit (" + formatFileSize(maxFileSize) + ")");
@@ -97,43 +109,52 @@ public class PDFIngestionApp {
 						continue;
 					}
 
-					// Calculate SHA256 hash
+					// Calculate SHA256 hash (first I/O operation)
 					System.out.println("  • Computing SHA256...");
-					String sha256 = Sha256Hasher.computeHash(filePath);
+					sha256 = Sha256Hasher.computeHash(filePath);
 
-					// Upsert document and get ID
-					System.out.println("  • Upserting document record...");
-					long docId = documentRepo.upsertAndGetId(fileName, filePath, sha256, fileSize);
-					System.out.println("  • Document ID: " + docId);
+					// Open connection for this PDF and reuse it
+					try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
+						// Upsert document and get ID (sets status = 'PROCESSING')
+						System.out.println("  • Upserting document record...");
+						docId = DocumentRepo.upsertAndGetId(conn, fileName, filePath, sha256, fileSize);
+						System.out.println("  • Document ID: " + docId);
 
-					// Extract pages
-					System.out.println("  • Extracting text by page...");
-					List<PDFReader.PageText> pages = pdfReader.extractPages(filePath);
-					System.out.println("  • Pages extracted: " + pages.size());
+						// Extract pages
+						System.out.println("  • Extracting text by page...");
+						List<PDFReader.PageText> pages = pdfReader.extractPages(filePath);
+						System.out.println("  • Pages extracted: " + pages.size());
 
-					// Insert chunks with citations
-					System.out.println("  • Storing chunks with page citations...");
-					chunkRepo.insertPageChunks(docId, pages);
+						// Insert chunks with citations (same connection)
+						System.out.println("  • Storing chunks with page citations...");
+						int chunkCount = ChunkRepo.insertPageChunks(conn, docId, pages);
+						System.out.println("  • Inserted/updated " + chunkCount + " chunks");
 
-					// Mark as done
-					documentRepo.markDone(docId);
-					System.out.println("  ✓ Success: " + pages.size() + " page(s) ingested");
-					processedCount++;
+						// Mark as done (same connection)
+						DocumentRepo.markDone(conn, docId);
+						System.out.println("  ✓ Success: " + pages.size() + " page(s) ingested");
+						processedCount++;
+					}
 
 				} catch (Exception e) {
 					System.err.println("  ✗ Error: " + e.getMessage());
-					e.printStackTrace();
-					
-					// Try to mark as failed in database
-					try {
-						long docId = documentRepo.upsertAndGetId(fileName, filePath, 
-							Sha256Hasher.computeHash(filePath), fileSize);
-						documentRepo.markFailed(docId, e.getMessage());
+					failedCount++;
+
+					// Try to mark as failed in database (reuse sha256, get docId if needed)
+					try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
+						// If docId was not obtained yet, upsert to get it
+						if (docId < 0 && sha256 != null) {
+							docId = DocumentRepo.upsertAndGetId(conn, fileName, filePath, sha256, fileSize);
+						}
+
+						// Mark as failed
+						if (docId >= 0) {
+							DocumentRepo.markFailed(conn, docId, truncateErrorMsg(e.getMessage()));
+							System.err.println("  • Marked as FAILED in database");
+						}
 					} catch (Exception ex) {
 						System.err.println("  ⚠ Could not mark document as failed in database: " + ex.getMessage());
 					}
-					
-					failedCount++;
 				}
 
 				System.out.println();
@@ -184,6 +205,17 @@ public class PDFIngestionApp {
 			}
 		}
 		return 1024 * 1024;  // 1MB default
+	}
+
+	/**
+	 * Truncate error message to fit in database (255 chars limit if needed).
+	 */
+	private static String truncateErrorMsg(String msg) {
+		if (msg == null) return "";
+		if (msg.length() > 1000) {
+			return msg.substring(0, 1000) + "...";
+		}
+		return msg;
 	}
 
 	/**

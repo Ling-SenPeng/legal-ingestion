@@ -14,7 +14,7 @@ All vector search features have been successfully implemented and integrated int
 
 #### 1. **embed-missing** - Generate embeddings for offline chunks
 ```bash
-java -jar legal-ingestion.jar embed-missing [--limit 100] [--batchSize 50]
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing [--limit 100] [--batchSize 50]"
 ```
 - Fetches chunks with NULL embeddings from PostgreSQL
 - Calls OpenAI text-embedding-3-small API (1536 dimensions)
@@ -24,7 +24,7 @@ java -jar legal-ingestion.jar embed-missing [--limit 100] [--batchSize 50]
 
 #### 2. **search** - Semantic search via vector similarity
 ```bash
-java -jar legal-ingestion.jar search --query "..." [--topK 10]
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query '...' [--topK 10]"
 ```
 - Generates embedding for user query (OpenAI)
 - Performs pgvector cosine distance search
@@ -119,10 +119,11 @@ java -jar legal-ingestion.jar search --query "..." [--topK 10]
 ## 🔒 Security & Configuration
 
 ### OpenAI API Key Management
-- **Location:** Environment variable `OPENAI_API_KEY`
-- **Why:** Secrets should not be stored in config files
-- **Usage:** `export OPENAI_API_KEY="sk-your-key"`
-- **Alternative:** Could be injected via Docker secrets in production
+- **Primary method:** Create `.env` file in project root: `echo 'OPENAI_API_KEY=sk-your-key' > .env`
+- **Alternative:** Set environment variable: `export OPENAI_API_KEY="sk-your-key"`
+- **Precedence:** System environment variable takes precedence over `.env` file
+- **Security:** `.env` file is automatically ignored by git (.gitignore)
+- **Production:** Use Docker secrets or environment-based secrets management
 
 ### Database Credentials
 - Still in config.properties (local development)
@@ -204,25 +205,26 @@ java -jar legal-ingestion.jar search --query "..." [--topK 10]
 
 ### Step 1: Setup
 ```bash
-export OPENAI_API_KEY="sk-your-key-here"
+# Create .env file with OpenAI API key
+echo 'OPENAI_API_KEY=sk-your-key-here' > .env
 mvn clean package
 ```
 
 ### Step 2: Ingest PDFs
 ```bash
-java -jar legal-ingestion.jar ingest
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 ```
 Creates pdf_documents and pdf_chunks with embedding=NULL
 
 ### Step 3: Generate Embeddings
 ```bash
-java -jar legal-ingestion.jar embed-missing --limit 500
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500"
 ```
 Fetches chunks, calls OpenAI API, stores embeddings
 
 ### Step 4: Search
 ```bash
-java -jar legal-ingestion.jar search --query "breach of contract" --topK 10
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract' --topK 10"
 ```
 Returns semantic search results with legal citations
 

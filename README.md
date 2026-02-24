@@ -29,17 +29,17 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 2. **Run the application using default directory (from config.properties)**
    ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest
+   mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
    ```
 
 3. **Run the application with a custom directory path**
    ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest /path/to/pdf/directory
+   mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdf/directory"
    ```
    
    Example:
    ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest ~/Documents/PDFs
+   mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest ~/Documents/PDFs"
    ```
 
 4. **For development (using Maven with classpath)**
@@ -59,49 +59,49 @@ The application now supports semantic search using OpenAI embeddings and Postgre
 
 #### 1. **ingest** - Process and store PDFs
 ```bash
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest [directory]
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest [directory]"
 ```
 Extracts text by page, stores in database with embeddings=NULL (ready for embedding generation).
 
 #### 2. **embed-missing** - Generate embeddings for chunks
 ```bash
 # Generate embeddings for all chunks without embeddings
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing"
 
 # Custom limit
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing --limit 200 --batchSize 50
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 200 --batchSize 50"
 ```
-**Requires:** Set `OPENAI_API_KEY` environment variable
+**Requires:** Set `OPENAI_API_KEY` environment variable or add to `.env` file
 
 #### 3. **search** - Semantic search across PDFs
 ```bash
 # Basic search
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar search --query "breach of contract"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract'"
 
 # Custom top-K results
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar search --query "liability" --topK 20
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'liability' --topK 20"
 ```
-**Requires:** Set `OPENAI_API_KEY` environment variable
+**Requires:** Set `OPENAI_API_KEY` environment variable or add to `.env` file
 
 **Returns legal citations:** file_name, file_path, page_no, similarity score
 
 ### Setup Vector Search
 
 ```bash
-# 1. Set OpenAI API key
-export OPENAI_API_KEY="sk-your-api-key"
+# 1. Create .env file with OpenAI API key
+echo 'OPENAI_API_KEY=sk-your-api-key' > .env
 
 # 2. Build the project
 mvn clean package
 
 # 3. Ingest PDFs (creates chunks with embedding=NULL)
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
 # 4. Generate embeddings for all chunks
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing --limit 1000
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 1000"
 
 # 5. Search for documents
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar search --query "your search term" --topK 10
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'your search term' --topK 10"
 ```
 
 ## Configuration
@@ -118,8 +118,8 @@ max.file.size=1048576
 2. Config file: `config.properties` (built into the JAR)
 3. Fallback default: Hardcoded in the code
 
-**Alternative (using JAR):**
-- `java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /custom/path`
+**Alternative (using Maven):**
+- `mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="/custom/path"`
 
 ## 📋 MVP Level 1 - Page-based Chunking & Database Ingestion
 
@@ -162,20 +162,14 @@ Expected output:
 
 #### 2. Run the ingestion app:
 
-**Using the JAR (recommended):**
+**Using Maven:**
 ```bash
 # Default config.properties directory
 mvn clean package
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
-# Custom directory and database
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest /path/to/pdfs
-```
-
-**Using Maven (during development):**
-```bash
-mvn clean compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
-  -Dexec.args="ingest /path/to/pdfs db.url db.user db.password"
+# Custom directory
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdfs"
 ```
 
 #### 3. Expected output:
@@ -454,17 +448,22 @@ db.password=ingestion_pass
 # Vector Search / Embeddings Configuration
 embeddings.enabled=true
 embeddings.model=text-embedding-3-small
-# IMPORTANT: OpenAI API key should be set via environment variable:
-#   export OPENAI_API_KEY="sk-..."
+# IMPORTANT: OpenAI API key should be set in .env file:
+#   echo 'OPENAI_API_KEY=sk-...' > .env
 ```
 
 **OpenAI API Key Setup:**
 ```bash
-# Required for embed-missing and search commands
-export OPENAI_API_KEY="sk-your-actual-api-key"
+# Create .env file with your API key (required for embed-missing and search commands)
+echo 'OPENAI_API_KEY=sk-your-actual-api-key' > .env
 
 # Verify it's set
-echo $OPENAI_API_KEY
+cat .env
+```
+
+**Note:** The `.env` file takes precedence when set, but you can still override with environment variable:
+```bash
+export OPENAI_API_KEY="sk-override-value"  # This takes precedence over .env
 ```
 
 ## Project Structure
@@ -530,12 +529,11 @@ mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="inge
 # Ingest with custom directory
 mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdfs"
 
-# Generate embeddings (requires OPENAI_API_KEY environment variable)
-export OPENAI_API_KEY="sk-..."
+# Generate embeddings (requires OPENAI_API_KEY in .env or environment variable)
 mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
   -Dexec.args="embed-missing --limit 100"
 
-# Search (requires OPENAI_API_KEY environment variable)
+# Search (requires OPENAI_API_KEY in .env or environment variable)
 mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
   -Dexec.args='search --query "your search" --topK 10'
 ```
@@ -574,14 +572,13 @@ mvn test -DargLine="-Xmx1024m"
 
 ```bash
 # 1. Ingest PDFs
-java -jar legal-ingestion.jar ingest ~/Documents/PDFs
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest ~/Documents/PDFs"
 
-# 2. Generate embeddings for 200 chunks
-export OPENAI_API_KEY="sk-..."
-java -jar legal-ingestion.jar embed-missing --limit 200
+# 2. Generate embeddings for 200 chunks (requires .env with OPENAI_API_KEY)
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 200"
 
 # 3. Search for documents
-java -jar legal-ingestion.jar search --query "contract terms" --topK 10
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'contract terms' --topK 10"
 ```
 
 ### Example Usage - Programmatic (Java)

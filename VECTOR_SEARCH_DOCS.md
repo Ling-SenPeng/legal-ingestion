@@ -92,23 +92,20 @@ LIMIT ?;
 
 #### Prerequisites
 ```bash
-# Set OpenAI API key (required for embed-missing and search)
-export OPENAI_API_KEY="sk-..."
+# Create .env file with OpenAI API key (required for embed-missing and search)
+echo 'OPENAI_API_KEY=sk-...' > .env
 
-# Build the JAR
+# Build the project
 mvn clean package
 ```
 
 #### 1. Embed Missing Embeddings
 ```bash
 # Generate embeddings for all chunks without embeddings (default: limit=100)
-java -jar legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing"
 
 # Custom limits
-java -jar legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing --limit 200 --batchSize 50
-
-# With classpath (during development)
-java -cp target/legal-ingestion-0.0.1-SNAPSHOT.jar com.ingestion.AppMain embed-missing --limit 50
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 200 --batchSize 50"
 ```
 
 **Output:**
@@ -131,13 +128,10 @@ Elapsed time: 12.34s
 #### 2. Semantic Search
 ```bash
 # Basic search (default topK=10)
-java -jar legal-ingestion-0.0.1-SNAPSHOT.jar search --query "breach of contract"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract'"
 
 # Custom top-K
-java -jar legal-ingestion-0.0.1-SNAPSHOT.jar search --query "liability" --topK 20
-
-# With classpath
-java -cp target/legal-ingestion-0.0.1-SNAPSHOT.jar com.ingestion.AppMain search --query "damages" --topK 5
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'liability' --topK 20"
 ```
 
 **Output:**
@@ -223,11 +217,10 @@ WITH (lists = 100);
 #### Test 1: Full pipeline with embeddings
 ```bash
 # 1. Ingest PDFs (creates chunks with NULL embeddings)
-java -jar legal-ingestion.jar ingest
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
-# 2. Generate embeddings
-export OPENAI_API_KEY="sk-..."
-java -jar legal-ingestion.jar embed-missing --limit 1000
+# 2. Generate embeddings (requires .env with OPENAI_API_KEY)
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 1000"
 
 # 3. Verify in database
 docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
@@ -235,13 +228,13 @@ docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
 # Should show: count = (number of successfully embedded chunks)
 
 # 4. Search
-java -jar legal-ingestion.jar search --query "legal term here" --topK 10
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'legal term here' --topK 10"
 ```
 
 #### Test 2: Error resilience
 ```bash
 # Verify failed chunks are printed but process continues
-java -jar legal-ingestion.jar embed-missing --limit 50
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 50"
 
 # Output should show individual failures printed but final summary shows attempts
 ```
@@ -249,9 +242,9 @@ java -jar legal-ingestion.jar embed-missing --limit 50
 #### Test 3: Search quality
 ```bash
 # Test multiple queries with different strategies
-java -jar legal-ingestion.jar search --query "contract" --topK 5
-java -jar legal-ingestion.jar search --query "payment terms" --topK 10
-java -jar legal-ingestion.jar search --query "breach liability damages" --topK 20
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'contract' --topK 5"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'payment terms' --topK 10"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach liability damages' --topK 20"
 
 # Verify results match expected legal context
 ```
@@ -278,7 +271,7 @@ java -jar legal-ingestion.jar search --query "breach liability damages" --topK 2
 ### Troubleshooting
 
 **Issue:** `OPENAI_API_KEY environment variable is not set`
-- **Solution:** `export OPENAI_API_KEY="sk-..."` before running
+- **Solution:** Create `.env` file: `echo 'OPENAI_API_KEY=sk-...' > .env` or set environment variable: `export OPENAI_API_KEY="sk-..."`
 
 **Issue:** `Search returns no results`
 - **Cause:** No embeddings generated yet
@@ -304,11 +297,11 @@ mvn clean compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
   -Dexec.args="search --query test"
 
 # Production build
-mvn clean package  # Creates legal-ingestion-0.0.1-SNAPSHOT.jar
+mvn clean package
 
-# Run from JAR
-java -jar legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing --limit 500
-java -jar legal-ingestion-0.0.1-SNAPSHOT.jar search --query "term" --topK 20
+# Run commands (requires .env with OPENAI_API_KEY)
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'term' --topK 20"
 ```
 
 ### Git Commit Info

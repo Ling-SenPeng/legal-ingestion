@@ -250,8 +250,9 @@ docker-compose down -v
 docker-compose up -d
 docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
 
-# Run ingestion
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+# Build and run ingestion
+mvn clean package
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
 # Expected: All PDFs processed, status=DONE, chunks created with page_no
 ```
@@ -259,7 +260,7 @@ java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
 **Scenario 2: Re-run (idempotency)**
 ```bash
 # Run ingestion again
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
 # Expected: 
 # - Existing PDFs updated (file_path, file_size synced)

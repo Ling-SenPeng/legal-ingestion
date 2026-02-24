@@ -3,8 +3,8 @@
 ## Setup
 
 ```bash
-# 1. Set OpenAI API key
-export OPENAI_API_KEY="sk-your-key-here"
+# 1. Create .env file with OpenAI API key
+echo 'OPENAI_API_KEY=sk-your-key-here' > .env
 
 # 2. Build
 mvn clean package
@@ -18,34 +18,34 @@ docker-compose up -d
 ### Ingest PDFs
 ```bash
 # Default directory from config.properties
-java -jar legal-ingestion.jar ingest
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
 # Custom directory
-java -jar legal-ingestion.jar ingest /path/to/pdfs
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdfs"
 ```
 
 ### Generate Embeddings
 ```bash
 # Default: limit=100
-java -jar legal-ingestion.jar embed-missing
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing"
 
 # Specific limit (get 500 chunks)
-java -jar legal-ingestion.jar embed-missing --limit 500
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500"
 
 # Custom batch size
-java -jar legal-ingestion.jar embed-missing --limit 500 --batchSize 100
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500 --batchSize 100"
 ```
 
 ### Search
 ```bash
 # Default topK=10
-java -jar legal-ingestion.jar search --query "your search term"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'your search term'"
 
 # Get top 20 results
-java -jar legal-ingestion.jar search --query "breach of contract" --topK 20
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract' --topK 20"
 
 # Multi-word query (must use quotes)
-java -jar legal-ingestion.jar search --query "payment terms and conditions" --topK 5
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'payment terms and conditions' --topK 5"
 ```
 
 ## Verify Progress
@@ -101,7 +101,8 @@ docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
 
 | Problem | Solution |
 |---------|----------|
-| `OPENAI_API_KEY not set` | Run: `export OPENAI_API_KEY="sk-..."` |
+| `.env` file not found | Create with: `echo 'OPENAI_API_KEY=sk-...' > .env` |
+| `OPENAI_API_KEY not set` | Add to `.env` file in project root |
 | `No results from search` | Run `embed-missing` first |
 | `PostgreSQL connection refused` | Start Docker: `docker-compose up -d` |
 | `vector type does not exist` | Run: `docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql` |

@@ -106,7 +106,7 @@ public class ChunkRepo {
 	 * @throws Exception if a database error occurs
 	 */
 	public static void updateEmbedding(Connection conn, long chunkId, float[] embedding) throws Exception {
-		String sql = "UPDATE pdf_chunks SET embedding = ? WHERE id = ?";
+		String sql = "UPDATE pdf_chunks SET embedding = ?::vector WHERE id = ?";
 
 		try (PreparedStatement stmt = conn.prepareStatement(sql)) {
 			if (embedding != null && embedding.length > 0) {

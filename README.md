@@ -117,6 +117,8 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      # Optional: Uncomment to use init.sql for automatic setup
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ingestion_user"]
@@ -141,6 +143,102 @@ docker-compose down
 **View database logs:**
 ```bash
 docker-compose logs postgres
+```
+
+### Initialize Database with pgvector
+
+After starting the PostgreSQL container, initialize the database with pgvector extension and create the required tables:
+
+**Option 1: Using Docker Compose exec**
+```bash
+# Connect to the database and create the extension and tables
+docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion << EOF
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS pdf_documents (
+    id SERIAL PRIMARY KEY,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL UNIQUE,
+    file_size BIGINT NOT NULL,
+    text_content TEXT,
+    preview VARCHAR(255),
+    embedding vector(1536),
+    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_file_path ON pdf_documents(file_path);
+CREATE INDEX idx_processed_at ON pdf_documents(processed_at);
+CREATE INDEX idx_embedding ON pdf_documents USING ivfflat (embedding vector_cosine_ops);
+EOF
+```
+
+**Option 2: Using psql directly**
+```bash
+# Connect to the running container
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion
+
+# Then run the SQL commands above manually
+```
+
+**Option 3: Using a SQL initialization script**
+
+Create a file `init.sql` in the project root:
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS pdf_documents (
+    id SERIAL PRIMARY KEY,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL UNIQUE,
+    file_size BIGINT NOT NULL,
+    text_content TEXT,
+    preview VARCHAR(255),
+    embedding vector(1536),
+    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_file_path ON pdf_documents(file_path);
+CREATE INDEX idx_processed_at ON pdf_documents(processed_at);
+CREATE INDEX idx_embedding ON pdf_documents USING ivfflat (embedding vector_cosine_ops);
+```
+
+Then update `docker-compose.yml` to mount and run this script:
+```yaml
+volumes:
+  - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+  - postgres_data:/var/lib/postgresql/data
+```
+
+Restart the container:
+```bash
+docker-compose down
+docker-compose up -d
+```
+
+### Verify Docker Setup
+
+Check if PostgreSQL and pgvector are running correctly:
+
+**Check container status:**
+```bash
+docker-compose ps
+```
+
+**Check pgvector is installed:**
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extname FROM pg_extension WHERE extname = 'vector';"
+```
+
+**Check tables were created:**
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c "\dt"
+```
+
+**Stop and clean up:**
+```bash
+docker-compose down -v  # -v removes volumes; omit to keep data
 ```
 
 ### Database Schema

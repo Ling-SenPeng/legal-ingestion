@@ -21,12 +21,18 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 ### Build and Run
 
-1. **Build the project**
+1. **Build the project with Maven**
    ```bash
    mvn clean package
    ```
+   This creates a fat JAR with all dependencies included.
 
-2. **Run the application with a directory path**
+2. **Run the application using default directory (from config.properties)**
+   ```bash
+   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+   ```
+
+3. **Run the application with a custom directory path**
    ```bash
    java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /path/to/pdf/directory
    ```
@@ -36,10 +42,23 @@ A Java application to read and process PDF files from a directory, built with Ma
    java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ~/Documents/PDFs
    ```
 
-3. **The application will:**
-   - Find all PDF files in the specified directory
+4. **The application will:**
+   - Find all PDF files in the specified directory (or from config.properties)
    - Extract text content from each PDF
    - Display file information and a preview of the content
+
+## Configuration
+
+The application reads the PDF directory from `src/main/resources/config.properties`:
+
+```properties
+pdf.ingestion.directory=/Users/ling-senpeng/Documents/divorce 2026
+```
+
+**Priority order for directory selection:**
+1. Command-line argument: `java -jar legal-ingestion-0.0.1-SNAPSHOT.jar /custom/path`
+2. Config file: `config.properties` (built into the JAR)
+3. Fallback default: Hardcoded in the code
 
 ## Project Structure
 
@@ -52,6 +71,7 @@ legal-ingestion/
 │   │   │   ├── PDFReader.java            (PDF reading utility)
 │   │   │   └── HelloWorld.java           (Hello World example)
 │   │   └── resources/
+│   │       ├── config.properties         (Configuration)
 │   │       └── application.properties
 │   └── test/
 │       └── java/com/ingestion/
@@ -63,19 +83,35 @@ legal-ingestion/
 
 ## Development
 
-### Building the Project
+### Maven Commands
+
+**Clean and Build**
 ```bash
 mvn clean package
 ```
 
-### Running Tests
+**Run Tests**
 ```bash
 mvn test
 ```
 
-### Running the PDF Ingestion Application
+**Compile Only (without packaging)**
 ```bash
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /path/to/pdfs
+mvn compile
+```
+
+**Run Application**
+```bash
+# Using default config.properties directory
+mvn exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+
+# Using custom directory
+mvn exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/path/to/pdfs"
+```
+
+**Run Tests with Coverage**
+```bash
+mvn test -DargLine="-Xmx1024m"
 ```
 
 ## Features

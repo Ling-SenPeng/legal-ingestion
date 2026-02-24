@@ -113,11 +113,6 @@ This project includes a `docker-compose.yml` file for running PostgreSQL with pg
 docker-compose up -d
 ```
 
-**Initialize the database with schema:**
-```bash
-docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
-```
-
 **Stop the database:**
 ```bash
 docker-compose down

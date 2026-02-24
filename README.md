@@ -94,7 +94,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: legal-ingestion-db
     environment:
       POSTGRES_USER: ingestion_user
@@ -131,9 +131,13 @@ docker-compose logs postgres
 
 ### Database Schema
 
-The application uses the following schema to store PDF content:
+The application uses the following schema to store PDF content with vector embeddings:
 
 ```sql
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Create table for PDF documents
 CREATE TABLE IF NOT EXISTS pdf_documents (
     id SERIAL PRIMARY KEY,
     file_name VARCHAR(255) NOT NULL,
@@ -141,13 +145,18 @@ CREATE TABLE IF NOT EXISTS pdf_documents (
     file_size BIGINT NOT NULL,
     text_content TEXT,
     preview VARCHAR(255),
+    embedding vector(1536),
     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create indexes for better query performance
 CREATE INDEX idx_file_path ON pdf_documents(file_path);
 CREATE INDEX idx_processed_at ON pdf_documents(processed_at);
+CREATE INDEX idx_embedding ON pdf_documents USING ivfflat (embedding vector_cosine_ops);
 ```
+
+**Note:** The `embedding` column stores 1536-dimensional vectors (suitable for OpenAI embeddings). Adjust the dimension based on your embedding model.
 
 ### Database Connection Configuration
 
@@ -161,9 +170,15 @@ db.name=legal_ingestion
 db.user=ingestion_user
 db.password=ingestion_pass
 db.enabled=false
+
+# Vector Embeddings Configuration (optional)
+embeddings.enabled=false
+embeddings.model=text-embedding-3-small
+embeddings.api.key=your-openai-api-key
 ```
 
 Set `db.enabled=true` to enable database persistence.
+Set `embeddings.enabled=true` to store vector embeddings for semantic search.
 
 ## Project Structure
 
@@ -237,6 +252,8 @@ The `PDFReader` class provides utilities to:
 
 ### Database Storage (Optional)
 - Store extracted PDF content and metadata in PostgreSQL (Docker)
+- Vector embeddings support with pgvector extension
+- Semantic search capabilities using vector similarity
 - Searchable text content for full-text queries
 - Timestamps for tracking processing history
 
@@ -258,7 +275,8 @@ for (PDFReader.PDFInfo info : pdfInfoList) {
 - **Apache PDFBox** (2.0.29) - For reading and extracting text from PDF files
 - **JUnit 5** - For unit testing
 - **PostgreSQL JDBC Driver** (optional) - For database persistence
-- **Docker & Docker Compose** (optional) - For PostgreSQL database container
+- **pgvector** (optional) - PostgreSQL extension for vector similarity search
+- **Docker & Docker Compose** (optional) - For PostgreSQL database container with pgvector
 
 ## License
 

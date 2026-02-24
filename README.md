@@ -29,34 +29,80 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 2. **Run the application using default directory (from config.properties)**
    ```bash
-   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest
    ```
 
 3. **Run the application with a custom directory path**
    ```bash
-   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/path/to/pdf/directory"
+   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest /path/to/pdf/directory
    ```
    
    Example:
    ```bash
-   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="~/Documents/PDFs"
+   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest ~/Documents/PDFs
    ```
 
-4. **Alternatively, run using the built JAR (after `mvn clean package`)**
+4. **For development (using Maven with classpath)**
    ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+   mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
    ```
-   
-   With custom directory:
-   ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /path/to/pdf/directory
-   ```
-
-5. **The application will:**
    - Find all PDF files in the specified directory (or from config.properties)
    - Extract text content from each PDF by page
    - Calculate SHA256 hash for deduplication
    - Store document metadata and page chunks in PostgreSQL
+
+## 🚀 Vector Search Feature
+
+The application now supports semantic search using OpenAI embeddings and PostgreSQL pgvector:
+
+### Commands
+
+#### 1. **ingest** - Process and store PDFs
+```bash
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest [directory]
+```
+Extracts text by page, stores in database with embeddings=NULL (ready for embedding generation).
+
+#### 2. **embed-missing** - Generate embeddings for chunks
+```bash
+# Generate embeddings for all chunks without embeddings
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing
+
+# Custom limit
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing --limit 200 --batchSize 50
+```
+**Requires:** Set `OPENAI_API_KEY` environment variable
+
+#### 3. **search** - Semantic search across PDFs
+```bash
+# Basic search
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar search --query "breach of contract"
+
+# Custom top-K results
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar search --query "liability" --topK 20
+```
+**Requires:** Set `OPENAI_API_KEY` environment variable
+
+**Returns legal citations:** file_name, file_path, page_no, similarity score
+
+### Setup Vector Search
+
+```bash
+# 1. Set OpenAI API key
+export OPENAI_API_KEY="sk-your-api-key"
+
+# 2. Build the project
+mvn clean package
+
+# 3. Ingest PDFs (creates chunks with embedding=NULL)
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest
+
+# 4. Generate embeddings for all chunks
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar embed-missing --limit 1000
+
+# 5. Search for documents
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar search --query "your search term" --topK 10
+```
 
 ## Configuration
 
@@ -116,21 +162,20 @@ Expected output:
 
 #### 2. Run the ingestion app:
 
-**Using Maven (default config.properties directory):**
+**Using the JAR (recommended):**
 ```bash
-mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
-```
-
-**Using Maven (custom directory and database):**
-```bash
-mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" \
-  -Dexec.args="/path/to/pdfs jdbc:postgresql://localhost:5432/legal_ingestion ingestion_user ingestion_pass"
-```
-
-**Using compiled JAR:**
-```bash
+# Default config.properties directory
 mvn clean package
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest
+
+# Custom directory and database
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ingest /path/to/pdfs
+```
+
+**Using Maven (during development):**
+```bash
+mvn clean compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
+  -Dexec.args="ingest /path/to/pdfs db.url db.user db.password"
 ```
 
 #### 3. Expected output:
@@ -395,22 +440,32 @@ The database schema (pgvector extension, tables, and indexes) is defined in `ini
 Add database connection details to `src/main/resources/config.properties`:
 
 ```properties
+# PDF Ingestion Directory Configuration
+pdf.ingestion.directory=/path/to/pdfs
+
+# Maximum file size to process (in bytes)
+max.file.size=1048576
+
 # Database Configuration
-db.host=localhost
-db.port=5432
-db.name=legal_ingestion
+db.url=jdbc:postgresql://localhost:5432/legal_ingestion
 db.user=ingestion_user
 db.password=ingestion_pass
-db.enabled=false
 
-# Vector Embeddings Configuration (optional)
-embeddings.enabled=false
+# Vector Search / Embeddings Configuration
+embeddings.enabled=true
 embeddings.model=text-embedding-3-small
-embeddings.api.key=your-openai-api-key
+# IMPORTANT: OpenAI API key should be set via environment variable:
+#   export OPENAI_API_KEY="sk-..."
 ```
 
-Set `db.enabled=true` to enable database persistence.
-Set `embeddings.enabled=true` to store vector embeddings for semantic search.
+**OpenAI API Key Setup:**
+```bash
+# Required for embed-missing and search commands
+export OPENAI_API_KEY="sk-your-actual-api-key"
+
+# Verify it's set
+echo $OPENAI_API_KEY
+```
 
 ## Project Structure
 
@@ -419,20 +474,33 @@ legal-ingestion/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/ingestion/
-│   │   │   ├── PDFIngestionApp.java      (Main application)
-│   │   │   ├── PDFReader.java            (PDF reading utility)
-│   │   │   └── HelloWorld.java           (Hello World example)
+│   │   │   ├── AppMain.java                (Main CLI entry point, subcommand routing)
+│   │   │   ├── PDFIngestionApp.java        (PDF ingestion pipeline)
+│   │   │   ├── PDFReader.java              (PDF reading & text extraction)
+│   │   │   ├── DocumentRepo.java           (PDF document persistence)
+│   │   │   ├── ChunkRepo.java              (PDF chunk + embedding persistence)
+│   │   │   ├── Sha256Hasher.java           (SHA256 file hashing)
+│   │   │   ├── OpenAIEmbeddingClient.java  (OpenAI embeddings API)
+│   │   │   ├── EmbedMissingCommand.java    (embed-missing command)
+│   │   │   ├── SearchCommand.java          (search command)
+│   │   │   ├── ChunkRow.java               (Data class for chunks)
+│   │   │   ├── SearchHit.java              (Data class for search results)
+│   │   │   └── HelloWorld.java             (Hello World example)
 │   │   └── resources/
-│   │       ├── config.properties         (Configuration)
+│   │       ├── config.properties           (Configuration)
 │   │       └── application.properties
 │   └── test/
 │       └── java/com/ingestion/
-│           ├── PDFReaderTest.java        (PDF reader tests)
-│           └── HelloWorldTest.java       (Hello World tests)
-├── docker-compose.yml                  (PostgreSQL + pgvector Docker setup)
-├── init.sql                            (Optional: Database initialization script)
+│           ├── PDFReaderTest.java          (PDF reader tests)
+│           └── HelloWorldTest.java         (Hello World tests)
+├── docker-compose.yml                      (PostgreSQL + pgvector Docker setup)
+├── init.sql                                (Database initialization script)
 ├── pom.xml
-└── README.md
+├── README.md
+├── OPTIMIZATION_SUMMARY.md                 (MVP L1 optimization details)
+├── VECTOR_SEARCH_DOCS.md                   (Complete vector search documentation)
+├── VECTOR_SEARCH_QUICK_REF.md             (Vector search quick reference)
+└── VECTOR_SEARCH_SUMMARY.md               (Implementation summary)
 ```
 
 ## Development
@@ -454,16 +522,23 @@ mvn test
 mvn compile
 ```
 
-**Run Application**
+**Run Application (Development)**
 ```bash
-# Using default config.properties directory
-mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+# Ingest PDFs (default config.properties directory)
+mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
-# Using custom directory
-mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/path/to/pdfs"
+# Ingest with custom directory
+mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdfs"
+
+# Generate embeddings (requires OPENAI_API_KEY environment variable)
+export OPENAI_API_KEY="sk-..."
+mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
+  -Dexec.args="embed-missing --limit 100"
+
+# Search (requires OPENAI_API_KEY environment variable)
+mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
+  -Dexec.args='search --query "your search" --topK 10'
 ```
-
-**Note:** The `mvn compile` phase is required before `exec:java` to ensure the classes are compiled and available.
 
 **Run Tests with Coverage**
 ```bash
@@ -472,46 +547,81 @@ mvn test -DargLine="-Xmx1024m"
 
 ## Features
 
-### PDF Reader
-The `PDFReader` class provides utilities to:
+### PDF Ingestion (ingest command)
 - **Find all PDF files** in a given directory (including subdirectories)
-- **Extract text by page** from PDF files using PDFBox (1-based page numbering)
-- **Get PDF information** including file path, text length, and content preview
-- **Validate file size** to skip files exceeding 1MB threshold
+- **Extract text by page** from PDF files using PDFBox (1-based page numbering for legal citations)
+- **Calculate SHA256 hash** for content deduplication  
+- **Database persistence** - Store document metadata and page chunks in PostgreSQL
+- **Status tracking** - Monitor processing (NEW → PROCESSING → DONE/FAILED)
+- **Error resilience** - Single PDF failure doesn't halt pipeline
+- **Idempotent processing** - Re-run safely without creating duplicates
 
-### Processed Files Tracking
-- Automatically tracks processed PDF files in `~/.pdf-ingestion/processed_files.txt`
-- Skips previously processed files on subsequent runs
-- Can be reset by deleting the tracking file if needed
+### Vector Search (embed-missing & search commands)
+- **Generate embeddings** - Call OpenAI text-embedding-3-small (1536 dimensions)
+- **Batch processing** - Configurable limits with error resilience
+- **Semantic search** - Find documents by meaning using cosine distance similarity
+- **Legal citations** - Return file name, path, and page number for each result
+- **Flexible scoring** - Similarity scores on search results
 
-### Database Storage (Optional)
-- Store extracted PDF content and metadata in PostgreSQL (Docker)
-- Vector embeddings support with pgvector extension
+### Database Storage
+- Store extracted PDF content and metadata in PostgreSQL
+- Vector embeddings support with pgvector extension (1536 dimensions)
 - Semantic search capabilities using vector similarity
 - Searchable text content for full-text queries
 - Timestamps for tracking processing history
 
-### Example Usage
+### Example Usage - Command Line
+
+```bash
+# 1. Ingest PDFs
+java -jar legal-ingestion.jar ingest ~/Documents/PDFs
+
+# 2. Generate embeddings for 200 chunks
+export OPENAI_API_KEY="sk-..."
+java -jar legal-ingestion.jar embed-missing --limit 200
+
+# 3. Search for documents
+java -jar legal-ingestion.jar search --query "contract terms" --topK 10
+```
+
+### Example Usage - Programmatic (Java)
 
 ```java
+// Using PDF Reader to extract pages
 PDFReader pdfReader = new PDFReader();
-List<PDFReader.PDFInfo> pdfInfoList = pdfReader.readAllPdfsFromDirectory("/path/to/pdfs");
+List<PDFReader.PageText> pages = pdfReader.extractPages("/path/to/file.pdf");
 
-for (PDFReader.PDFInfo info : pdfInfoList) {
-    System.out.println("File: " + info.fileName);
-    System.out.println("Text Length: " + info.textLength);
-    System.out.println("Preview: " + info.preview);
-}
+// Using DocumentRepo for persistence
+Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+long docId = DocumentRepo.upsertAndGetId(conn, fileName, filePath, sha256, fileSize);
+
+// Using ChunkRepo for chunks
+ChunkRepo.insertPageChunks(conn, docId, pages);
+
+// Using search (after embeddings are generated)
+OpenAIEmbeddingClient client = new OpenAIEmbeddingClient(apiKey);
+float[] queryEmbedding = client.embed("search query");
+List<SearchHit> results = ChunkRepo.searchByVector(conn, queryEmbedding, 10);
 ```
 
 ## Dependencies
 
 - **Apache PDFBox** (2.0.29) - For reading and extracting text from PDF files
-- **JUnit 5** - For unit testing
-- **PostgreSQL JDBC Driver** (optional) - For database persistence
-- **pgvector** (optional) - PostgreSQL extension for vector similarity search
+- **PostgreSQL JDBC Driver** (42.7.3) - For database connectivity
+- **Jackson Databind** (2.16.1) - For JSON serialization (OpenAI API integration)
+- **JUnit 5** (5.10.0) - For unit testing
+- **pgvector** (PostgreSQL extension) - For vector similarity search
 - **Docker & Docker Compose** (optional) - For PostgreSQL database container with pgvector
 
 ## License
 
 Apache-2.0 License
+
+## Additional Documentation
+
+For detailed information on the vector search feature:
+
+- **[VECTOR_SEARCH_DOCS.md](VECTOR_SEARCH_DOCS.md)** - Complete guide with architecture, examples, and troubleshooting
+- **[VECTOR_SEARCH_QUICK_REF.md](VECTOR_SEARCH_QUICK_REF.md)** - Quick reference for CLI commands
+- **[VECTOR_SEARCH_SUMMARY.md](VECTOR_SEARCH_SUMMARY.md)** - Implementation summary and acceptance criteria
+- **[OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md)** - MVP Level 1 optimization details (production-ready)

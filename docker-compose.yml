@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: legal-ingestion-db
+    environment:
+      POSTGRES_USER: ingestion_user
+      POSTGRES_PASSWORD: ingestion_pass
+      POSTGRES_DB: legal_ingestion
+    ports:
+      - "5432:5432"
+    volumes:
+      # Optional: Uncomment to use init.sql for automatic setup
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ingestion_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

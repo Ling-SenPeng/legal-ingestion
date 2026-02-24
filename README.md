@@ -101,34 +101,12 @@ This application can store extracted PDF content in a PostgreSQL database.
 
 ### Start PostgreSQL Container
 
-Create a `docker-compose.yml` file in the project root:
+This project includes a `docker-compose.yml` file for running PostgreSQL with pgvector. 
 
-```yaml
-version: '3.8'
+**To get started with Docker:**
 
-services:
-  postgres:
-    image: pgvector/pgvector:pg15
-    container_name: legal-ingestion-db
-    environment:
-      POSTGRES_USER: ingestion_user
-      POSTGRES_PASSWORD: ingestion_pass
-      POSTGRES_DB: legal_ingestion
-    ports:
-      - "5432:5432"
-    volumes:
-      # Optional: Uncomment to use init.sql for automatic setup
-      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ingestion_user"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data:
-```
+1. Ensure Docker and Docker Compose are installed
+2. A `docker-compose.yml` file is included in the project root with the required configuration
 
 **Start the database:**
 ```bash
@@ -309,6 +287,8 @@ legal-ingestion/
 │       └── java/com/ingestion/
 │           ├── PDFReaderTest.java        (PDF reader tests)
 │           └── HelloWorldTest.java       (Hello World tests)
+├── docker-compose.yml                  (PostgreSQL + pgvector Docker setup)
+├── init.sql                            (Optional: Database initialization script)
 ├── pom.xml
 └── README.md
 ```

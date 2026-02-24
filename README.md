@@ -125,74 +125,43 @@ docker-compose logs postgres
 
 ### Initialize Database with pgvector
 
-After starting the PostgreSQL container, initialize the database with pgvector extension and create the required tables:
+The database schema is defined in `init.sql`. You can initialize the database using one of these methods:
 
-**Option 1: Using Docker Compose exec**
-```bash
-# Connect to the database and create the extension and tables
-docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion << EOF
-CREATE EXTENSION IF NOT EXISTS vector;
+**Option 1: Automatic initialization (Recommended)**
 
-CREATE TABLE IF NOT EXISTS pdf_documents (
-    id SERIAL PRIMARY KEY,
-    file_name VARCHAR(255) NOT NULL,
-    file_path TEXT NOT NULL UNIQUE,
-    file_size BIGINT NOT NULL,
-    text_content TEXT,
-    preview VARCHAR(255),
-    embedding vector(1536),
-    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+Update `docker-compose.yml` to uncomment the init.sql volume mount:
 
-CREATE INDEX idx_file_path ON pdf_documents(file_path);
-CREATE INDEX idx_processed_at ON pdf_documents(processed_at);
-CREATE INDEX idx_embedding ON pdf_documents USING ivfflat (embedding vector_cosine_ops);
-EOF
-```
-
-**Option 2: Using psql directly**
-```bash
-# Connect to the running container
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion
-
-# Then run the SQL commands above manually
-```
-
-**Option 3: Using a SQL initialization script**
-
-Create a file `init.sql` in the project root:
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE TABLE IF NOT EXISTS pdf_documents (
-    id SERIAL PRIMARY KEY,
-    file_name VARCHAR(255) NOT NULL,
-    file_path TEXT NOT NULL UNIQUE,
-    file_size BIGINT NOT NULL,
-    text_content TEXT,
-    preview VARCHAR(255),
-    embedding vector(1536),
-    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_file_path ON pdf_documents(file_path);
-CREATE INDEX idx_processed_at ON pdf_documents(processed_at);
-CREATE INDEX idx_embedding ON pdf_documents USING ivfflat (embedding vector_cosine_ops);
-```
-
-Then update `docker-compose.yml` to mount and run this script:
 ```yaml
 volumes:
   - ./init.sql:/docker-entrypoint-initdb.d/init.sql
   - postgres_data:/var/lib/postgresql/data
 ```
 
-Restart the container:
+Then start the container:
 ```bash
 docker-compose down
 docker-compose up -d
+```
+
+PostgreSQL will automatically run `init.sql` on first startup.
+
+**Option 2: Docker exec with init.sql**
+```bash
+docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
+```
+
+**Option 3: Interactive psql connection**
+```bash
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion
+
+# Then paste the contents of init.sql manually
+```
+
+**Option 4: Using docker exec with heredoc**
+```bash
+docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion << EOF
+$(cat init.sql)
+EOF
 ```
 
 ### Verify Docker Setup
@@ -221,30 +190,23 @@ docker-compose down -v  # -v removes volumes; omit to keep data
 
 ### Database Schema
 
-The application uses the following schema to store PDF content with vector embeddings:
+The database schema (pgvector extension, tables, and indexes) is defined in `init.sql`. 
 
-```sql
--- Enable pgvector extension
-CREATE EXTENSION IF NOT EXISTS vector;
+The table `pdf_documents` stores:
+- `id` - Unique identifier
+- `file_name` - PDF file name
+- `file_path` - Full path to the file (unique constraint)
+- `file_size` - Size in bytes
+- `text_content` - Extracted text content from the PDF
+- `preview` - Short preview of the content
+- `embedding` - Vector embeddings (1536 dimensions) for semantic search
+- `processed_at` - Timestamp when the file was processed
+- `created_at` - Timestamp when the record was created
 
--- Create table for PDF documents
-CREATE TABLE IF NOT EXISTS pdf_documents (
-    id SERIAL PRIMARY KEY,
-    file_name VARCHAR(255) NOT NULL,
-    file_path TEXT NOT NULL UNIQUE,
-    file_size BIGINT NOT NULL,
-    text_content TEXT,
-    preview VARCHAR(255),
-    embedding vector(1536),
-    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create indexes for better query performance
-CREATE INDEX idx_file_path ON pdf_documents(file_path);
-CREATE INDEX idx_processed_at ON pdf_documents(processed_at);
-CREATE INDEX idx_embedding ON pdf_documents USING ivfflat (embedding vector_cosine_ops);
-```
+**Indexes:**
+- `idx_file_path` - For fast file path lookups
+- `idx_processed_at` - For sorting by processing date
+- `idx_embedding` - IVFFLAT index for vector similarity search
 
 **Note:** The `embedding` column stores 1536-dimensional vectors (suitable for OpenAI embeddings). Adjust the dimension based on your embedding model.
 

@@ -1,6 +1,10 @@
 -- Enable pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- Drop tables if they exist (in reverse order of creation due to foreign keys)
+DROP TABLE IF EXISTS pdf_chunks;
+DROP TABLE IF EXISTS pdf_documents;
+
 -- Create table for PDF documents
 CREATE TABLE IF NOT EXISTS pdf_documents (
   id BIGSERIAL PRIMARY KEY,

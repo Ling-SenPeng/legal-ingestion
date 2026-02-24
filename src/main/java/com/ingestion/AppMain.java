@@ -12,6 +12,9 @@ public class AppMain {
 	private static final String CONFIG_FILE = "config.properties";
 
 	public static void main(String[] args) {
+		// Load environment variables from .env file (if present)
+		EnvLoader.load();
+
 		if (args.length == 0) {
 			printUsage();
 			System.exit(1);

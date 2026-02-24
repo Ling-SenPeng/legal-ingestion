@@ -37,3 +37,8 @@ target/
 
 # Spring Boot
 spring-boot-devtools.properties
+
+# Environment variables (secrets)
+.env
+.env.local
+.env.*.local

@@ -68,9 +68,12 @@ max.file.size=1048576
 ```
 
 **Priority order for directory selection:**
-1. Command-line argument: `java -jar legal-ingestion-0.0.1-SNAPSHOT.jar /custom/path`
+1. Command-line argument: `mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/custom/path"`
 2. Config file: `config.properties` (built into the JAR)
 3. Fallback default: Hardcoded in the code
+
+**Alternative (using JAR):**
+- `java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /custom/path`
 
 ### Processed Files Tracking
 

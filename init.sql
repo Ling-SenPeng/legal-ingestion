@@ -40,3 +40,8 @@ CREATE TABLE IF NOT EXISTS pdf_chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pdf_chunks_doc_page ON pdf_chunks(doc_id, page_no);
+
+-- Cosine distance index (commonly used for OpenAI embeddings)
+CREATE INDEX IF NOT EXISTS idx_pdf_chunks_embedding
+ON pdf_chunks USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);

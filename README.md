@@ -29,23 +29,34 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 2. **Run the application using default directory (from config.properties)**
    ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
    ```
 
 3. **Run the application with a custom directory path**
    ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /path/to/pdf/directory
+   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/path/to/pdf/directory"
    ```
    
    Example:
    ```bash
-   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar ~/Documents/PDFs
+   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="~/Documents/PDFs"
    ```
 
-4. **The application will:**
+4. **Alternatively, run using the built JAR (after `mvn clean package`)**
+   ```bash
+   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+   ```
+   
+   With custom directory:
+   ```bash
+   java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar /path/to/pdf/directory
+   ```
+
+5. **The application will:**
    - Find all PDF files in the specified directory (or from config.properties)
    - Extract text content from each PDF
    - Display file information and a preview of the content
+   - Track processed files to avoid duplicates on subsequent runs
 
 ## Configuration
 

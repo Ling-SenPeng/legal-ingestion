@@ -74,12 +74,8 @@ public class TesseractOcrService {
 			} catch (Exception e) {
 				if (attempt < MAX_RETRIES) {
 					long backoffMs = 1000L * (attempt + 1);  // 1s, 2s backoff
-					System.err.println("    [OCR Retry " + (attempt + 1) + "/" + MAX_RETRIES + 
-						"] Failed (will retry in " + backoffMs + "ms): " + e.getMessage());
 					Thread.sleep(backoffMs);
 				} else {
-					System.err.println("    [OCR Failed] Exhausted retries for page " + (pageIndex + 1) + 
-						": " + e.getMessage());
 					throw e;
 				}
 			}

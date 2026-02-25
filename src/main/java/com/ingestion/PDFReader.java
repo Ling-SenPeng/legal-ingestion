@@ -191,16 +191,14 @@ public class PDFReader {
 							try {
 								// pageNum is 1-based, but PDFBox page index is 0-based
 								int pageIndex = pageNum - 1;
-								System.out.println("    [OCR] Processing page " + pageNum + "...");
 								String ocrText = ocr.ocrPage(pdfFilePath, pageIndex);
 								
 								if (ocrText != null && !ocrText.trim().isEmpty()) {
 									finalPageText = ocrText;
 									source = "ocr";
-									System.out.println("    [OCR] Success, extracted " + ocrText.length() + " chars");
 								}
 							} catch (Exception e) {
-								System.err.println("    [OCR] Failed for page " + pageNum + ": " + e.getMessage());
+								System.err.println("Warning: OCR failed for page " + pageNum + ": " + e.getMessage());
 								// Keep pdfbox text as fallback
 							}
 						}

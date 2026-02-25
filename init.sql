@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS pdf_chunks (
   text TEXT NOT NULL,
 
   embedding vector(1536),                    -- OpenAI 1536-dimensional vector
+  ts tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(text,''))) STORED,  -- Full-text search index
   meta JSONB NOT NULL DEFAULT '{}'::jsonb,   -- Reserved: char_count, extractor, language...
 
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -40,6 +41,9 @@ CREATE TABLE IF NOT EXISTS pdf_chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pdf_chunks_doc_page ON pdf_chunks(doc_id, page_no);
+
+-- Full-text search index (for hybrid search keyword matching)
+CREATE INDEX IF NOT EXISTS idx_pdf_chunks_ts ON pdf_chunks USING GIN (ts);
 
 -- Cosine distance index (commonly used for OpenAI embeddings)
 CREATE INDEX IF NOT EXISTS idx_pdf_chunks_embedding

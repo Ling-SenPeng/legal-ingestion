@@ -294,4 +294,106 @@ public class ChunkRepo {
 
 		return hits;
 	}
+
+	/**
+	 * Search chunks by vector similarity with detailed result information.
+	 * Used by hybrid search to combine vector and keyword results.
+	 * Returns detailed info including chunk_id and document metadata.
+	 *
+	 * @param conn the database connection
+	 * @param queryVec the query embedding vector (1536 dimensions)
+	 * @param limit the maximum number of results to return
+	 * @return a list of maps containing: chunkId, docId, fileName, filePath, pageNo, text, score (vector score)
+	 * @throws Exception if a database error occurs
+	 */
+	public static List<java.util.Map<String, Object>> searchByVectorDetailed(Connection conn, float[] queryVec, int limit) throws Exception {
+		// Convert query vector to PostgreSQL format
+		StringBuilder vecStr = new StringBuilder("[");
+		for (int i = 0; i < queryVec.length; i++) {
+			if (i > 0) vecStr.append(",");
+			vecStr.append(queryVec[i]);
+		}
+		vecStr.append("]");
+		String queryVecStr = vecStr.toString();
+
+		// SQL: cosine distance (1 - cosine_similarity)
+		String sql =
+			"SELECT c.id as chunk_id, c.doc_id, d.file_name, d.file_path, c.page_no, c.text, " +
+			"       (1 - (c.embedding <=> ?::vector)) as vector_score " +
+			"FROM pdf_chunks c " +
+			"JOIN pdf_documents d ON d.id = c.doc_id " +
+			"WHERE c.embedding IS NOT NULL " +
+			"ORDER BY c.embedding <=> ?::vector " +
+			"LIMIT ?";
+
+		List<java.util.Map<String, Object>> results = new ArrayList<>();
+
+		try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+			stmt.setString(1, queryVecStr);
+			stmt.setString(2, queryVecStr);
+			stmt.setInt(3, limit);
+
+			try (ResultSet rs = stmt.executeQuery()) {
+				while (rs.next()) {
+					java.util.Map<String, Object> row = new java.util.HashMap<>();
+					row.put("chunkId", rs.getLong("chunk_id"));
+					row.put("docId", rs.getLong("doc_id"));
+					row.put("fileName", rs.getString("file_name"));
+					row.put("filePath", rs.getString("file_path"));
+					row.put("pageNo", rs.getInt("page_no"));
+					row.put("text", rs.getString("text"));
+					row.put("vectorScore", rs.getDouble("vector_score"));
+					results.add(row);
+				}
+			}
+		}
+
+		return results;
+	}
+
+	/**
+	 * Search chunks by keyword using full-text search (tsvector + plainto_tsquery).
+	 * Used by hybrid search to combine vector and keyword results.
+	 *
+	 * @param conn the database connection
+	 * @param query the search query (keywords, names, case numbers, etc.)
+	 * @param limit the maximum number of results to return
+	 * @return a list of maps containing: chunkId, docId, fileName, filePath, pageNo, text, score (keyword score)
+	 * @throws Exception if a database error occurs
+	 */
+	public static List<java.util.Map<String, Object>> searchByKeyword(Connection conn, String query, int limit) throws Exception {
+		// SQL: full-text search using tsvector and ts_rank for scoring
+		String sql =
+			"SELECT c.id as chunk_id, c.doc_id, d.file_name, d.file_path, c.page_no, c.text, " +
+			"       ts_rank(c.ts, plainto_tsquery('english', ?)) as keyword_score " +
+			"FROM pdf_chunks c " +
+			"JOIN pdf_documents d ON d.id = c.doc_id " +
+			"WHERE c.ts @@ plainto_tsquery('english', ?) " +
+			"ORDER BY keyword_score DESC " +
+			"LIMIT ?";
+
+		List<java.util.Map<String, Object>> results = new ArrayList<>();
+
+		try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+			stmt.setString(1, query);
+			stmt.setString(2, query);
+			stmt.setInt(3, limit);
+
+			try (ResultSet rs = stmt.executeQuery()) {
+				while (rs.next()) {
+					java.util.Map<String, Object> row = new java.util.HashMap<>();
+					row.put("chunkId", rs.getLong("chunk_id"));
+					row.put("docId", rs.getLong("doc_id"));
+					row.put("fileName", rs.getString("file_name"));
+					row.put("filePath", rs.getString("file_path"));
+					row.put("pageNo", rs.getInt("page_no"));
+					row.put("text", rs.getString("text"));
+					row.put("keywordScore", rs.getDouble("keyword_score"));
+					results.add(row);
+				}
+			}
+		}
+
+		return results;
+	}
 }

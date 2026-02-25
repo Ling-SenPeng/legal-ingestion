@@ -16,16 +16,8 @@ import com.ingestion.PDFReader.PageText;
 public class ChunkRepo {
 
 	/**
-	 * Insert page chunks for a document using batch upsert with paragraph-level granularity.
-	 * Splits each page into paragraphs (separated by blank lines).
-	 * Uses upsert (INSERT ... ON CONFLICT ... DO UPDATE) to handle duplicates.
-	 * If a chunk already exists for (doc_id, page_no, chunk_index), updates the text and metadata.
-	 *
-	 * Processing:
-	 * - Split page text by blank lines: text.split("\\n\\s*\\n")
-	 * - For each paragraph: trim, skip if length < 50 characters
-	 * - Generate chunk_index incrementally (0, 1, 2, ...)
-	 * - Insert with metadata: chunk_type="paragraph", char_count
+	 * Insert page chunks for a document using batch upsert with paragraph-level granularity and overlap.
+	 * Default overlap: 200 characters.
 	 *
 	 * @param conn the database connection
 	 * @param docId the document ID
@@ -34,6 +26,34 @@ public class ChunkRepo {
 	 * @throws Exception if a database error occurs
 	 */
 	public static int insertPageChunks(Connection conn, long docId, List<PageText> pages) throws Exception {
+		return insertPageChunks(conn, docId, pages, 200);  // Default overlap: 200 chars
+	}
+
+	/**
+	 * Insert page chunks for a document using batch upsert with paragraph-level granularity and overlap.
+	 * Splits each page into paragraphs (separated by blank lines), applies overlap to avoid semantic breaks.
+	 * Uses upsert (INSERT ... ON CONFLICT ... DO UPDATE) to handle duplicates.
+	 * If a chunk already exists for (doc_id, page_no, chunk_index), updates the text and metadata.
+	 *
+	 * Processing:
+	 * - Split page text by blank lines: text.split("\\n\\s*\\n")
+	 * - For each paragraph: trim, skip if length < 50 characters
+	 * - Apply overlap: prepend last N characters (overlapChars) from previous chunk
+	 * - Generate chunk_index incrementally (0, 1, 2, ...)
+	 * - Insert with metadata: chunk_type="paragraph_overlap", char_count, overlap_chars
+	 *
+	 * Example:
+	 * - Paragraph 0 (100 chars): "chunk 0 text..." → no overlap
+	 * - Paragraph 1 (120 chars): "text..." + " " + "chunk 1 text..." → overlap last 200 chars from overlapped chunk 0
+	 *
+	 * @param conn the database connection
+	 * @param docId the document ID
+	 * @param pages the list of PageText objects (one per page)
+	 * @param overlapChars the number of characters to overlap from previous chunk (default: 200)
+	 * @return the total number of chunks inserted/updated
+	 * @throws Exception if a database error occurs
+	 */
+	public static int insertPageChunks(Connection conn, long docId, List<PageText> pages, int overlapChars) throws Exception {
 		if (pages == null || pages.isEmpty()) {
 			return 0;
 		}
@@ -51,30 +71,50 @@ public class ChunkRepo {
 			for (PageText page : pages) {
 				// Split page text by blank lines (paragraph separator)
 				// Pattern: \n\s*\n matches newline, optional whitespace, newline
-				String[] paragraphs = page.text.split("\\n\\s*\\n");
+				String[] rawParagraphs = page.text.split("\\n\\s*\\n");
 
-				int chunkIndex = 0;  // Reset chunk index for each page
+				// Step 1: Filter paragraphs - keep only those >= 50 chars after trim
+				List<String> validParagraphs = new ArrayList<>();
+				for (String p : rawParagraphs) {
+					String trimmed = p.trim();
+					if (trimmed.length() >= 50) {
+						validParagraphs.add(trimmed);
+					}
+				}
 
-				for (String paragraph : paragraphs) {
-					// Trim whitespace
-					paragraph = paragraph.trim();
+				// Step 2: Build overlapped chunks
+				List<String> overlappedChunks = new ArrayList<>();
+				for (int i = 0; i < validParagraphs.size(); i++) {
+					String current = validParagraphs.get(i);
 
-					// Skip if length < 50 characters
-					if (paragraph.length() < 50) {
-						continue;
+					// Apply overlap for all chunks except the first one
+					if (i > 0) {
+						// Get the previous overlapped chunk (which already has overlap applied)
+						String prev = overlappedChunks.get(overlappedChunks.size() - 1);
+						
+						// Extract the last N characters from previous chunk
+						int start = Math.max(0, prev.length() - overlapChars);
+						String overlap = prev.substring(start);
+						
+						// Prepend overlap to current paragraph with space separator
+						current = overlap + " " + current;
 					}
 
-					// Build metadata JSON with chunk_type and char_count
-					String metaJson = buildMetaJson(paragraph.length(), "paragraph");
+					overlappedChunks.add(current);
+				}
+
+				// Step 3: Insert overlapped chunks to database
+				for (int i = 0; i < overlappedChunks.size(); i++) {
+					String chunkText = overlappedChunks.get(i);
+					String metaJson = buildMetaJson(chunkText.length(), "paragraph_overlap", overlapChars);
 
 					stmt.setLong(1, docId);
 					stmt.setInt(2, page.pageNo);
-					stmt.setInt(3, chunkIndex);
-					stmt.setString(4, paragraph);
+					stmt.setInt(3, i);  // chunk_index = 0, 1, 2, ...
+					stmt.setString(4, chunkText);
 					stmt.setString(5, metaJson);
 
 					stmt.addBatch();
-					chunkIndex++;
 					totalChunksInserted++;
 				}
 			}
@@ -90,11 +130,27 @@ public class ChunkRepo {
 	}
 
 	/**
+	 * Build JSON metadata for a chunk with overlap information.
+	 * Includes: extractor (pdfbox), char_count, chunk_type, overlap_chars
+	 *
+	 * @param charCount the character count of the chunk text
+	 * @param chunkType the type of chunk (e.g., "paragraph_overlap", "page")
+	 * @param overlapChars the number of characters overlapped from previous chunk
+	 * @return JSON string for the metadata
+	 */
+	private static String buildMetaJson(int charCount, String chunkType, int overlapChars) {
+		return String.format(
+			"{\"extractor\": \"pdfbox\", \"char_count\": %d, \"chunk_type\": \"%s\", \"overlap_chars\": %d}",
+			charCount, chunkType, overlapChars
+		);
+	}
+
+	/**
 	 * Build JSON metadata for a chunk.
 	 * Includes: extractor (pdfbox), char_count, chunk_type
 	 *
 	 * @param charCount the character count of the chunk text
-	 * @param chunkType the type of chunk (e.g., "paragraph", "page")
+	 * @param chunkType the type of chunk (e.g., "paragraph_overlap", "page")
 	 * @return JSON string for the metadata
 	 */
 	private static String buildMetaJson(int charCount, String chunkType) {

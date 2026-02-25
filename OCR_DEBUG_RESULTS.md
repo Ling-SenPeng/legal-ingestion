@@ -38,6 +38,15 @@ Without Tesseract installed, the pipeline will fail when accessing scanned PDF p
 Cannot run program "tesseract": Exec failed, error: 2 (No such file or directory)
 ```
 
+### Optional: JBIG2 Image Support
+
+PDFs with JBIG2 compressed images will generate a warning:
+```
+Cannot read JBIG2 image: jbig2-imageio is not installed
+```
+
+This is **non-critical** - the pipeline will continue processing other images. To suppress this warning, you can add the jbig2-imageio ImageIO plugin as described in the [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md).
+
 ---
 
 ## Summary

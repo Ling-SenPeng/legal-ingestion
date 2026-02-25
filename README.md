@@ -43,6 +43,14 @@ A Java application to read and process PDF files from a directory, built with Ma
    **Other Systems:**
    - See: https://github.com/UB-Mannheim/tesseract/wiki
 
+### Optional Dependencies
+
+**JBIG2 Image Support** (Optional)
+- Some PDFs use JBIG2 compression format
+- If encountered, you'll see a warning: `Cannot read JBIG2 image: jbig2-imageio is not installed`
+- This is **non-critical** - the pipeline will continue processing
+- See [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md) for JBIG2 installation if needed
+
 ### Build and Run
 
 1. **Build the project with Maven**

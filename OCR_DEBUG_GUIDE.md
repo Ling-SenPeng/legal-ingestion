@@ -40,6 +40,32 @@ IOException: Cannot run program "tesseract": Exec failed, error: 2 (No such file
 **❌ Error: tesseract: command not found**
 **Solution:** Tesseract is installed but not in PATH. Verify installation with `which tesseract`.
 
+### Optional: JBIG2 Image Support
+
+**⚠️ Warning: Cannot read JBIG2 image: jbig2-imageio is not installed**
+
+This warning appears when processing PDFs with JBIG2 compression format. It is **non-critical** - the pipeline will:
+- Continue processing other images in the PDF
+- Fall back to OCR if text extraction fails
+- Produce valid output despite the warning
+
+**Why you see this:**
+- JBIG2 is a specialized compression format used in some scanned PDFs
+- The jbig2-imageio ImageIO plugin is optional and not bundled with PDFBox
+- PDFBox will log a warning but continue processing
+
+**When to install JBIG2 support:**
+- You frequently process PDFs with JBIG2 images
+- You want to suppress the warning logs
+- You want optimal image quality for OCR on those specific images
+
+**To add JBIG2 support (Optional):**
+```bash
+# This library needs to be installed separately
+# Download from: https://github.com/levigo/imageio-jbig2
+# Or use: com.levigo.jbig2:levigo-jbig2-imageio via Maven if available in your repository
+```
+
 ---
 
 ## Quick Start: Enabling Debug Output

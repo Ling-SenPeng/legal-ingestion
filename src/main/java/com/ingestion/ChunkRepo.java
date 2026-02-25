@@ -15,9 +15,14 @@ import com.ingestion.PDFReader.PageText;
  */
 public class ChunkRepo {
 
+	// Configuration constants for sliding window chunking
+	private static final int DEFAULT_WINDOW_SIZE = 2;
+	private static final int DEFAULT_STRIDE = 1;
+	private static final int MIN_PARAGRAPH_CHARS = 50;
+
 	/**
-	 * Insert page chunks for a document using batch upsert with paragraph-level granularity and overlap.
-	 * Default overlap: 200 characters.
+	 * Insert page chunks for a document using sliding window paragraph chunking (Legal RAG).
+	 * Default: windowSize=2, stride=1 (produces overlapping context windows).
 	 *
 	 * @param conn the database connection
 	 * @param docId the document ID
@@ -26,34 +31,38 @@ public class ChunkRepo {
 	 * @throws Exception if a database error occurs
 	 */
 	public static int insertPageChunks(Connection conn, long docId, List<PageText> pages) throws Exception {
-		return insertPageChunks(conn, docId, pages, 200);  // Default overlap: 200 chars
+		return insertPageChunks(conn, docId, pages, DEFAULT_WINDOW_SIZE, DEFAULT_STRIDE);
 	}
 
 	/**
-	 * Insert page chunks for a document using batch upsert with paragraph-level granularity and overlap.
-	 * Splits each page into paragraphs (separated by blank lines), applies overlap to avoid semantic breaks.
+	 * Insert page chunks for a document using sliding window paragraph chunking (Legal RAG).
+	 * Splits each page into paragraphs, generates window chunks for enhanced semantic context.
 	 * Uses upsert (INSERT ... ON CONFLICT ... DO UPDATE) to handle duplicates.
-	 * If a chunk already exists for (doc_id, page_no, chunk_index), updates the text and metadata.
 	 *
 	 * Processing:
-	 * - Split page text by blank lines: text.split("\\n\\s*\\n")
-	 * - For each paragraph: trim, skip if length < 50 characters
-	 * - Apply overlap: prepend last N characters (overlapChars) from previous chunk
-	 * - Generate chunk_index incrementally (0, 1, 2, ...)
-	 * - Insert with metadata: chunk_type="paragraph_overlap", char_count, overlap_chars
+	 * 1. Split page text by blank lines: text.split("\\n\\s*\\n")
+	 * 2. Filter: trim, keep only paragraphs >= 50 characters
+	 * 3. Generate sliding windows:
+	 *    - for i = 0 to paragraphs.size()-1 step stride
+	 *    - take paragraphs[i .. i+windowSize-1]
+	 *    - if fewer than windowSize remain: include as-is if enough paragraphs
+	 * 4. Combine window paragraphs with "\\n\\n" separator
+	 * 5. Write to DB with metadata: window_size, stride, paragraph_count
 	 *
-	 * Example:
-	 * - Paragraph 0 (100 chars): "chunk 0 text..." → no overlap
-	 * - Paragraph 1 (120 chars): "text..." + " " + "chunk 1 text..." → overlap last 200 chars from overlapped chunk 0
+	 * Example (windowSize=2, stride=1):
+	 * - Para[0,1]: "Para0 text\\n\\nPara1 text" → chunk_index=0
+	 * - Para[1,2]: "Para1 text\\n\\nPara2 text" → chunk_index=1
+	 * - Para[2,3]: "Para2 text\\n\\nPara3 text" → chunk_index=2
 	 *
 	 * @param conn the database connection
 	 * @param docId the document ID
 	 * @param pages the list of PageText objects (one per page)
-	 * @param overlapChars the number of characters to overlap from previous chunk (default: 200)
+	 * @param windowSize number of paragraphs per window (default: 2)
+	 * @param stride number of paragraphs to slide per step (default: 1)
 	 * @return the total number of chunks inserted/updated
 	 * @throws Exception if a database error occurs
 	 */
-	public static int insertPageChunks(Connection conn, long docId, List<PageText> pages, int overlapChars) throws Exception {
+	public static int insertPageChunks(Connection conn, long docId, List<PageText> pages, int windowSize, int stride) throws Exception {
 		if (pages == null || pages.isEmpty()) {
 			return 0;
 		}
@@ -69,53 +78,55 @@ public class ChunkRepo {
 
 		try (PreparedStatement stmt = conn.prepareStatement(upsertSql)) {
 			for (PageText page : pages) {
-				// Split page text by blank lines (paragraph separator)
+				// Step 1: Split page text by blank lines (paragraph separator)
 				// Pattern: \n\s*\n matches newline, optional whitespace, newline
 				String[] rawParagraphs = page.text.split("\\n\\s*\\n");
 
-				// Step 1: Filter paragraphs - keep only those >= 50 chars after trim
+				// Step 2: Filter paragraphs - keep only those >= minParaChars after trim
 				List<String> validParagraphs = new ArrayList<>();
 				for (String p : rawParagraphs) {
 					String trimmed = p.trim();
-					if (trimmed.length() >= 50) {
+					if (trimmed.length() >= MIN_PARAGRAPH_CHARS) {
 						validParagraphs.add(trimmed);
 					}
 				}
 
-				// Step 2: Build overlapped chunks
-				List<String> overlappedChunks = new ArrayList<>();
-				for (int i = 0; i < validParagraphs.size(); i++) {
-					String current = validParagraphs.get(i);
+				// Step 3: Generate sliding window chunks
+				int chunkIndex = 0;
+				for (int i = 0; i < validParagraphs.size(); i += stride) {
+					// Determine window end: take min(i+windowSize, paragraphs.size())
+					int windowEnd = Math.min(i + windowSize, validParagraphs.size());
+					int actualWindowSize = windowEnd - i;
 
-					// Apply overlap for all chunks except the first one
-					if (i > 0) {
-						// Get the previous overlapped chunk (which already has overlap applied)
-						String prev = overlappedChunks.get(overlappedChunks.size() - 1);
-						
-						// Extract the last N characters from previous chunk
-						int start = Math.max(0, prev.length() - overlapChars);
-						String overlap = prev.substring(start);
-						
-						// Prepend overlap to current paragraph with space separator
-						current = overlap + " " + current;
+					// Skip if window has fewer than 1 paragraph (shouldn't happen with stride >= 1)
+					if (actualWindowSize < 1) {
+						break;
 					}
 
-					overlappedChunks.add(current);
-				}
+					// Build window chunk text by joining paragraphs with "\\n\\n"
+					StringBuilder windowText = new StringBuilder();
+					for (int j = i; j < windowEnd; j++) {
+						if (j > i) {
+							windowText.append("\n\n");  // Paragraph separator
+						}
+						windowText.append(validParagraphs.get(j));
+					}
 
-				// Step 3: Insert overlapped chunks to database
-				for (int i = 0; i < overlappedChunks.size(); i++) {
-					String chunkText = overlappedChunks.get(i);
-					String metaJson = buildMetaJson(chunkText.length(), "paragraph_overlap", overlapChars);
+					String chunkText = windowText.toString();
 
+					// Build metadata with window information
+					String metaJson = buildMetaJson(chunkText.length(), "paragraph_window", windowSize, stride, actualWindowSize);
+
+					// Insert window chunk
 					stmt.setLong(1, docId);
 					stmt.setInt(2, page.pageNo);
-					stmt.setInt(3, i);  // chunk_index = 0, 1, 2, ...
+					stmt.setInt(3, chunkIndex);
 					stmt.setString(4, chunkText);
 					stmt.setString(5, metaJson);
 
 					stmt.addBatch();
 					totalChunksInserted++;
+					chunkIndex++;
 				}
 			}
 
@@ -130,18 +141,20 @@ public class ChunkRepo {
 	}
 
 	/**
-	 * Build JSON metadata for a chunk with overlap information.
-	 * Includes: extractor (pdfbox), char_count, chunk_type, overlap_chars
+	 * Build JSON metadata for a window-based chunk.
+	 * Includes: extractor (pdfbox), char_count, chunk_type, window_size, stride, paragraph_count
 	 *
 	 * @param charCount the character count of the chunk text
-	 * @param chunkType the type of chunk (e.g., "paragraph_overlap", "page")
-	 * @param overlapChars the number of characters overlapped from previous chunk
+	 * @param chunkType the type of chunk (e.g., "paragraph_window")
+	 * @param windowSize the number of paragraphs per window
+	 * @param stride the stride size for sliding window
+	 * @param paragraphCount the actual number of paragraphs in this window
 	 * @return JSON string for the metadata
 	 */
-	private static String buildMetaJson(int charCount, String chunkType, int overlapChars) {
+	private static String buildMetaJson(int charCount, String chunkType, int windowSize, int stride, int paragraphCount) {
 		return String.format(
-			"{\"extractor\": \"pdfbox\", \"char_count\": %d, \"chunk_type\": \"%s\", \"overlap_chars\": %d}",
-			charCount, chunkType, overlapChars
+			"{\"extractor\": \"pdfbox\", \"char_count\": %d, \"chunk_type\": \"%s\", \"window_size\": %d, \"stride\": %d, \"paragraph_count\": %d}",
+			charCount, chunkType, windowSize, stride, paragraphCount
 		);
 	}
 
@@ -150,7 +163,7 @@ public class ChunkRepo {
 	 * Includes: extractor (pdfbox), char_count, chunk_type
 	 *
 	 * @param charCount the character count of the chunk text
-	 * @param chunkType the type of chunk (e.g., "paragraph_overlap", "page")
+	 * @param chunkType the type of chunk (e.g., "paragraph_window", "page")
 	 * @return JSON string for the metadata
 	 */
 	private static String buildMetaJson(int charCount, String chunkType) {

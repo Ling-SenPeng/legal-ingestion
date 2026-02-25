@@ -49,22 +49,39 @@ This warning appears when processing PDFs with JBIG2 compression format. It is *
 - Fall back to OCR if text extraction fails
 - Produce valid output despite the warning
 
-**Why you see this:**
+#### Why You See This
 - JBIG2 is a specialized compression format used in some scanned PDFs
 - The jbig2-imageio ImageIO plugin is optional and not bundled with PDFBox
-- PDFBox will log a warning but continue processing
+- PDFBox will log a warning but continue processing normally
 
-**When to install JBIG2 support:**
-- You frequently process PDFs with JBIG2 images
-- You want to suppress the warning logs
-- You want optimal image quality for OCR on those specific images
+#### Suppressing the Warning ✅
 
-**To add JBIG2 support (Optional):**
+The project has logging configuration files that automatically suppress this warning:
+
+**Using the built JAR (Recommended):**
 ```bash
-# This library needs to be installed separately
-# Download from: https://github.com/levigo/imageio-jbig2
-# Or use: com.levigo.jbig2:levigo-jbig2-imageio via Maven if available in your repository
+java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+# JBIG2 warning will NOT appear
 ```
+
+**Logging configuration files included:**
+- `src/main/resources/logback.xml` - Logback configuration (if using Logback)
+- `src/main/resources/logging.properties` - Java Util Logging configuration
+
+**In your IDE (Eclipse/IntelliJ):**
+- Configure to use the logging configuration from `src/main/resources/logback.xml`
+- Refer to your IDE's logging configuration documentation
+
+#### Advanced: Adding JBIG2 Support (Optional)
+
+If you need actual JBIG2 image processing (not just suppressing warnings):
+```bash
+# This library needs external installation
+# Download from: https://github.com/levigo/imageio-jbig2
+# Or find a Maven repository that hosts com.levigo.jbig2:levigo-jbig2-imageio
+```
+
+Note: JBIG2 licensing restrictions mean it's often not available in standard Maven repositories.
 
 ---
 

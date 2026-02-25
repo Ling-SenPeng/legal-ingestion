@@ -45,7 +45,18 @@ PDFs with JBIG2 compressed images will generate a warning:
 Cannot read JBIG2 image: jbig2-imageio is not installed
 ```
 
-This is **non-critical** - the pipeline will continue processing other images. To suppress this warning, you can add the jbig2-imageio ImageIO plugin as described in the [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md).
+This is **non-critical** - the pipeline will continue processing other images. 
+
+**To suppress this warning:**
+- The project includes logging configuration files (`logback.xml` and `logging.properties`) that suppress non-critical JBIG2 warnings
+- These are automatically used when running the application
+- The warning will not appear in console output
+
+**If you still see the warning:**
+- Ensure you're running from the built JAR with `java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar`
+- Or check your logging configuration in your IDE/execution environment
+
+For advanced users who need JBIG2 image processing support, see [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md#optional-jbig2-image-support).
 
 ---
 

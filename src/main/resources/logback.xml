@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Suppress non-critical JBIG2 image warnings from PDFBox -->
+    <logger name="org.apache.pdfbox.contentstream.PDFStreamEngine" level="WARN"/>
+    
+    <!-- Set PDFBox to WARNING level to reduce verbose logging -->
+    <logger name="org.apache.pdfbox" level="WARN"/>
+    
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+    
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+</configuration>

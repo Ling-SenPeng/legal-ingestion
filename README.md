@@ -47,9 +47,11 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 **JBIG2 Image Support** (Optional)
 - Some PDFs use JBIG2 compression format
-- If encountered, you'll see a warning: `Cannot read JBIG2 image: jbig2-imageio is not installed`
+- If encountered, you may see a warning: `Cannot read JBIG2 image: jbig2-imageio is not installed`
 - This is **non-critical** - the pipeline will continue processing
-- See [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md) for JBIG2 installation if needed
+- The warning is automatically suppressed when running the compiled JAR
+- To suppress in your IDE, configure to use `src/main/resources/logback.xml`
+- See [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md#optional-jbig2-image-support) for advanced JBIG2 support
 
 ### Build and Run
 

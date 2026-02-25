@@ -8,6 +8,40 @@ This guide documents how to troubleshoot the OCR pipeline if issues are encounte
 
 ---
 
+## Prerequisites & System Requirements
+
+### Tesseract OCR Engine
+
+The OCR pipeline requires Tesseract to be installed and accessible on your system.
+
+**Installation Instructions:**
+
+| OS | Command |
+|---|---|
+| **macOS** | `brew install tesseract` |
+| **Ubuntu/Debian** | `sudo apt-get install tesseract-ocr` |
+| **Windows** | Install from https://github.com/UB-Mannheim/tesseract/wiki |
+| **Other** | Consult https://github.com/UB-Mannheim/tesseract/wiki |
+
+**Verify Installation:**
+```bash
+tesseract --version
+# Output should show version 5.x.x
+```
+
+### Common Installation Issues
+
+**❌ Error: Cannot run program "tesseract"**
+```
+IOException: Cannot run program "tesseract": Exec failed, error: 2 (No such file or directory)
+```
+**Solution:** Tesseract is not installed or not in system PATH. Follow installation instructions above.
+
+**❌ Error: tesseract: command not found**
+**Solution:** Tesseract is installed but not in PATH. Verify installation with `which tesseract`.
+
+---
+
 ## Quick Start: Enabling Debug Output
 
 If you need to troubleshoot the OCR pipeline, you can re-enable detailed logging by adding the debug prints back to:

@@ -37,7 +37,22 @@
    - Ready for production
 ```
 
-### 3. Documentation Updated
+### 3. Runtime Dependencies
+
+⚠️ **Important:** The OCR pipeline requires Tesseract to be installed on the system.
+
+**Tesseract OCR** is a **runtime dependency** (not a Maven dependency) needed for:
+- Processing scanned PDF pages (pages with < 30 characters of extracted text)
+- Converting PDF page images to searchable text via OCR
+
+During testing, Tesseract 5.5.2 was installed via `brew install tesseract` (macOS) and verified to work with all 26 pages of MC-30-1.pdf successfully.
+
+**If Tesseract is not installed:**
+- The pipeline will compile successfully ✅
+- Runtime will fail with: `IOException: Cannot run program "tesseract"`
+- See [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md) for installation instructions
+
+### 4. Documentation Updated
 
 #### OCR_DEBUG_RESULTS.md
 - Updated to reflect current "production ready" status

@@ -6,6 +6,40 @@
 
 ---
 
+## System Requirements
+
+For the OCR pipeline to function correctly, Tesseract OCR engine must be installed on your system.
+
+### Tesseract OCR Installation
+
+The scanned PDF processing feature requires **Tesseract OCR** (version 5.5.2+ tested and verified).
+
+**macOS:**
+```bash
+brew install tesseract
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install tesseract-ocr
+```
+
+**Windows:**
+- Download from: https://github.com/UB-Mannheim/tesseract/wiki
+- Run installer and add to system PATH
+
+**Verify Installation:**
+```bash
+tesseract --version
+```
+
+Without Tesseract installed, the pipeline will fail when accessing scanned PDF pages. The error message will be:
+```
+Cannot run program "tesseract": Exec failed, error: 2 (No such file or directory)
+```
+
+---
+
 ## Summary
 
 The OCR pipeline has been successfully debugged, tested, and verified with MC-30-1.pdf. All debug code has been removed and the pipeline is production-ready.

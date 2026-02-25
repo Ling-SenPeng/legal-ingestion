@@ -6,6 +6,7 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 - **Java 17**
 - **Maven 3.9+**
+- **Tesseract OCR** (for processing scanned PDFs)
 
 ## 🛠️ Setup Instructions
 
@@ -18,6 +19,29 @@ A Java application to read and process PDF files from a directory, built with Ma
 2. **Maven**
    - Download and install from [maven.apache.org](https://maven.apache.org/install.html)
    - Verify installation: `mvn --version`
+
+3. **Tesseract OCR** (Required for OCR functionality)
+   
+   **macOS:**
+   ```bash
+   brew install tesseract
+   ```
+   Verify installation:
+   ```bash
+   tesseract --version
+   ```
+   
+   **Ubuntu/Debian:**
+   ```bash
+   sudo apt-get install tesseract-ocr
+   ```
+   
+   **Windows:**
+   - Download installer from: https://github.com/UB-Mannheim/tesseract/wiki
+   - Run the installer and add to PATH
+   
+   **Other Systems:**
+   - See: https://github.com/UB-Mannheim/tesseract/wiki
 
 ### Build and Run
 

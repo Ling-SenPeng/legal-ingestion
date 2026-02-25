@@ -16,14 +16,21 @@ import com.ingestion.PDFReader.PageText;
 public class ChunkRepo {
 
 	/**
-	 * Insert page chunks for a document using batch upsert.
+	 * Insert page chunks for a document using batch upsert with paragraph-level granularity.
+	 * Splits each page into paragraphs (separated by blank lines).
 	 * Uses upsert (INSERT ... ON CONFLICT ... DO UPDATE) to handle duplicates.
 	 * If a chunk already exists for (doc_id, page_no, chunk_index), updates the text and metadata.
+	 *
+	 * Processing:
+	 * - Split page text by blank lines: text.split("\\n\\s*\\n")
+	 * - For each paragraph: trim, skip if length < 50 characters
+	 * - Generate chunk_index incrementally (0, 1, 2, ...)
+	 * - Insert with metadata: chunk_type="paragraph", char_count
 	 *
 	 * @param conn the database connection
 	 * @param docId the document ID
 	 * @param pages the list of PageText objects (one per page)
-	 * @return the number of chunks inserted/updated
+	 * @return the total number of chunks inserted/updated
 	 * @throws Exception if a database error occurs
 	 */
 	public static int insertPageChunks(Connection conn, long docId, List<PageText> pages) throws Exception {
@@ -38,35 +45,74 @@ public class ChunkRepo {
 			"ON CONFLICT (doc_id, page_no, chunk_index) DO UPDATE " +
 			"SET text = EXCLUDED.text, meta = EXCLUDED.meta, created_at = CURRENT_TIMESTAMP";
 
+		int totalChunksInserted = 0;
+
 		try (PreparedStatement stmt = conn.prepareStatement(upsertSql)) {
 			for (PageText page : pages) {
-				// Build metadata JSON
-				String metaJson = buildMetaJson(page.text.length());
-				
-				stmt.setLong(1, docId);
-				stmt.setInt(2, page.pageNo);
-				stmt.setInt(3, 0);  // chunk_index = 0 for MVP
-				stmt.setString(4, page.text);
-				stmt.setString(5, metaJson);
+				// Split page text by blank lines (paragraph separator)
+				// Pattern: \n\s*\n matches newline, optional whitespace, newline
+				String[] paragraphs = page.text.split("\\n\\s*\\n");
 
-				stmt.addBatch();
+				int chunkIndex = 0;  // Reset chunk index for each page
+
+				for (String paragraph : paragraphs) {
+					// Trim whitespace
+					paragraph = paragraph.trim();
+
+					// Skip if length < 50 characters
+					if (paragraph.length() < 50) {
+						continue;
+					}
+
+					// Build metadata JSON with chunk_type and char_count
+					String metaJson = buildMetaJson(paragraph.length(), "paragraph");
+
+					stmt.setLong(1, docId);
+					stmt.setInt(2, page.pageNo);
+					stmt.setInt(3, chunkIndex);
+					stmt.setString(4, paragraph);
+					stmt.setString(5, metaJson);
+
+					stmt.addBatch();
+					chunkIndex++;
+					totalChunksInserted++;
+				}
 			}
 
 			// Execute batch
-			int[] results = stmt.executeBatch();
-			return results.length;
+			if (totalChunksInserted > 0) {
+				int[] results = stmt.executeBatch();
+				return results.length;
+			}
+
+			return 0;
 		}
 	}
 
 	/**
 	 * Build JSON metadata for a chunk.
+	 * Includes: extractor (pdfbox), char_count, chunk_type
+	 *
+	 * @param charCount the character count of the chunk text
+	 * @param chunkType the type of chunk (e.g., "paragraph", "page")
+	 * @return JSON string for the metadata
+	 */
+	private static String buildMetaJson(int charCount, String chunkType) {
+		return String.format(
+			"{\"extractor\": \"pdfbox\", \"char_count\": %d, \"chunk_type\": \"%s\"}",
+			charCount, chunkType
+		);
+	}
+
+	/**
+	 * Build JSON metadata for a chunk (legacy, defaults to "page" type).
 	 * Includes: extractor (pdfbox), char_count
 	 *
 	 * @param charCount the character count of the chunk text
 	 * @return JSON string for the metadata
 	 */
 	private static String buildMetaJson(int charCount) {
-		return String.format("{\"extractor\": \"pdfbox\", \"char_count\": %d}", charCount);
+		return buildMetaJson(charCount, "page");
 	}
 
 	/**

@@ -10,50 +10,46 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /**
  * A utility class to read and extract text from PDF files in a directory.
  * State is now managed by the database (SHA256 deduplication, status tracking).
+ * 
+ * Supports OCR for scanned/image-based pages:
+ * - Automatically detects pages needing OCR (< 30 chars text)
+ * - Renders pages to images and calls tesseract
+ * - Records OCR metadata in page output
  */
 public class PDFReader {
 
 	private static final String CONFIG_FILE = "config.properties";
-	private static final long DEFAULT_MAX_FILE_SIZE = 1024 * 1024; // 1 MB fallback
-	private static final long MAX_FILE_SIZE = loadMaxFileSize();
+	private TesseractOcrService ocrService;  // Lazy-initialized OCR service
 
 	public PDFReader() {
+		this.ocrService = null;  // Lazy init on first OCR need
 	}
 
 	/**
-	 * Load the maximum file size from config.properties.
-	 *
-	 * @return the maximum file size in bytes from config, or default if not found
+	 * Get or initialize the OCR service (lazy initialization).
+	 * 
+	 * @param threadPoolSize number of concurrent OCR threads
+	 * @return the OCR service, or null if tesseract is not available
 	 */
-	private static long loadMaxFileSize() {
-		Properties properties = new Properties();
-		try (InputStream input = PDFReader.class.getClassLoader().getResourceAsStream(CONFIG_FILE)) {
-			if (input == null) {
-				System.out.println("Warning: " + CONFIG_FILE + " not found. Using default max file size.");
-				return DEFAULT_MAX_FILE_SIZE;
+	private synchronized TesseractOcrService getOcrService(int threadPoolSize) {
+		if (ocrService == null) {
+			if (TesseractOcrService.isTesseractAvailable()) {
+				ocrService = new TesseractOcrService(threadPoolSize);
+				System.out.println("    [OCR] Tesseract initialized with " + threadPoolSize + " threads");
+			} else {
+				System.out.println("    [OCR] WARNING: Tesseract not available. Scanned pages will not be OCR'd.");
+				return null;  // Tesseract not available
 			}
-			properties.load(input);
-			String maxSizeStr = properties.getProperty("max.file.size");
-			if (maxSizeStr != null && !maxSizeStr.trim().isEmpty()) {
-				try {
-					long maxSize = Long.parseLong(maxSizeStr);
-					System.out.println("Loaded max file size from config: " + formatFileSize(maxSize));
-					return maxSize;
-				} catch (NumberFormatException e) {
-					System.err.println("Invalid max.file.size value: " + maxSizeStr + ". Using default.");
-				}
-			}
-		} catch (IOException e) {
-			System.err.println("Error loading config file: " + e.getMessage());
 		}
-		System.out.println("Using default max file size: " + formatFileSize(DEFAULT_MAX_FILE_SIZE));
-		return DEFAULT_MAX_FILE_SIZE;
+		return ocrService;
 	}
 
 	/**
@@ -80,6 +76,13 @@ public class PDFReader {
 	}
 
 	/**
+	 * Get OCR service for manual use (if needed).
+	 */
+	public TesseractOcrService getOcrServiceIfAvailable() {
+		return getOcrService(2);
+	}
+
+	/**
 	 * Extracts text from a single PDF file.
 	 *
 	 * @param pdfFilePath the path to the PDF file
@@ -95,7 +98,7 @@ public class PDFReader {
 
 	/**
 	 * Extracts text and basic information from all PDF files in a directory.
-	 * Only processes files smaller than 1MB.
+	 * NOTE: File size limits have been removed. Large PDFs will be processed.
 	 *
 	 * @param directoryPath the path to the directory
 	 * @return a list of PDF information objects
@@ -110,11 +113,7 @@ public class PDFReader {
 				String filePath = pdfFile.toString();
 				long fileSize = Files.size(pdfFile);
 				
-				if (fileSize > MAX_FILE_SIZE) {
-					System.out.println("Skipping file (size > 1MB): " + pdfFile.getFileName() + " (" + formatFileSize(fileSize) + ")");
-					continue;
-				}
-				
+				// NOTE: File size limit removed - all PDFs are processed
 				String text = extractTextFromPdf(filePath);
 				PDFInfo info = new PDFInfo(
 					pdfFile.getFileName().toString(),
@@ -153,7 +152,13 @@ public class PDFReader {
 	}
 
 	/**
-	 * Extract text from each page of a PDF file.
+	 * Extract text from each page of a PDF file, with OCR for pages needing it.
+	 *
+	 * Process:
+	 * 1. Extract text using PDFBox for each page
+	 * 2. For each page, check if OCR is needed (using OcrDecider)
+	 * 3. If yes and tesseract available, render page to image and OCR
+	 * 4. Return PageText list with metadata (source: pdfbox/ocr)
 	 *
 	 * @param pdfFilePath the path to the PDF file
 	 * @return a list of PageText objects, one per page (1-based page numbering)
@@ -171,12 +176,37 @@ public class PDFReader {
 					stripper.setEndPage(pageNum);
 					String pageText = stripper.getText(document);
 					
-					// Treat null or empty text as empty string
+					// Treat null as empty string
 					if (pageText == null) {
 						pageText = "";
 					}
 					
-					pages.add(new PageText(pageNum, pageText));
+					String finalPageText = pageText;
+					String source = "pdfbox";
+					
+					// Check if OCR is needed
+					if (OcrDecider.shouldOcr(pageText)) {
+						TesseractOcrService ocr = getOcrService(2);
+						if (ocr != null) {
+							try {
+								// pageNum is 1-based, but PDFBox page index is 0-based
+								int pageIndex = pageNum - 1;
+								System.out.println("    [OCR] Processing page " + pageNum + "...");
+								String ocrText = ocr.ocrPage(pdfFilePath, pageIndex);
+								
+								if (ocrText != null && !ocrText.trim().isEmpty()) {
+									finalPageText = ocrText;
+									source = "ocr";
+									System.out.println("    [OCR] Success, extracted " + ocrText.length() + " chars");
+								}
+							} catch (Exception e) {
+								System.err.println("    [OCR] Failed for page " + pageNum + ": " + e.getMessage());
+								// Keep pdfbox text as fallback
+							}
+						}
+					}
+					
+					pages.add(new PageText(pageNum, finalPageText));
 				} catch (Exception e) {
 					// If we fail to extract a page, add empty text for that page
 					System.err.println("Warning: Failed to extract text from page " + pageNum + " of " + pdfFilePath + ": " + e.getMessage());

@@ -185,6 +185,52 @@ public class ChunkRepo {
 	}
 
 	/**
+	 * Build JSON metadata for a window chunk with page-level metadata.
+	 * Merges page-level info (source, ocr_engine, dpi) with chunk-level info.
+	 *
+	 * @param charCount the character count of the chunk text
+	 * @param chunkType the type of chunk (e.g., "paragraph_window")
+	 * @param windowSize the number of paragraphs per window
+	 * @param stride the stride size for sliding window
+	 * @param paragraphCount the actual number of paragraphs in this window
+	 * @param pageSource the source of page text ("pdfbox" or "ocr")
+	 * @param additionalPageMeta additional metadata from page (can be null)
+	 * @return JSON string for the metadata
+	 */
+	private static String buildMetaJsonWithPageSource(
+		int charCount, String chunkType, int windowSize, int stride, int paragraphCount,
+		String pageSource, java.util.Map<String, Object> additionalPageMeta
+	) {
+		// Build JSON with page source and chunk info
+		StringBuilder json = new StringBuilder();
+		json.append("{");
+		json.append("\"source\": \"").append(pageSource).append("\", ");
+		json.append("\"char_count\": ").append(charCount).append(", ");
+		json.append("\"chunk_type\": \"").append(chunkType).append("\", ");
+		json.append("\"window_size\": ").append(windowSize).append(", ");
+		json.append("\"stride\": ").append(stride).append(", ");
+		json.append("\"paragraph_count\": ").append(paragraphCount);
+
+		// Add OCR-specific fields if present
+		if (additionalPageMeta != null) {
+			if ("ocr".equals(pageSource)) {
+				if (additionalPageMeta.containsKey("ocr_engine")) {
+					json.append(", \"ocr_engine\": \"").append(additionalPageMeta.get("ocr_engine")).append("\"");
+				}
+				if (additionalPageMeta.containsKey("ocr_lang")) {
+					json.append(", \"ocr_lang\": \"").append(additionalPageMeta.get("ocr_lang")).append("\"");
+				}
+				if (additionalPageMeta.containsKey("dpi")) {
+					json.append(", \"dpi\": ").append(additionalPageMeta.get("dpi"));
+				}
+			}
+		}
+
+		json.append("}");
+		return json.toString();
+	}
+
+	/**
 	 * Fetch chunks with missing embeddings.
 	 * Queries chunks where embedding IS NULL.
 	 *

@@ -84,7 +84,7 @@ public class PDFIngestionApp {
 				return;
 			}
 
-			// Filter files > 1MB and process each
+			// NOTE: File size limits removed - all PDFs will be processed
 			int processedCount = 0;
 			int skippedCount = 0;
 			int failedCount = 0;
@@ -101,14 +101,6 @@ public class PDFIngestionApp {
 				long docId = -1;
 
 				try {
-					// Check file size first (no I/O yet)
-					long maxFileSize = loadMaxFileSize(props);
-					if (fileSize > maxFileSize) {
-						System.out.println("  ⊘ Skipped: file size (" + formatFileSize(fileSize) + ") > limit (" + formatFileSize(maxFileSize) + ")");
-						skippedCount++;
-						continue;
-					}
-
 					// Calculate SHA256 hash (first I/O operation)
 					System.out.println("  • Computing SHA256...");
 					sha256 = Sha256Hasher.computeHash(filePath);
@@ -188,23 +180,6 @@ public class PDFIngestionApp {
 			System.out.println("Warning: Could not load config.properties: " + e.getMessage());
 		}
 		return null;
-	}
-
-	/**
-	 * Load maximum file size from config or return default.
-	 */
-	private static long loadMaxFileSize(Properties props) {
-		if (props != null) {
-			String maxSizeStr = props.getProperty("max.file.size");
-			if (maxSizeStr != null && !maxSizeStr.trim().isEmpty()) {
-				try {
-					return Long.parseLong(maxSizeStr);
-				} catch (NumberFormatException e) {
-					System.out.println("Warning: Invalid max.file.size: " + maxSizeStr);
-				}
-			}
-		}
-		return 1024 * 1024;  // 1MB default
 	}
 
 	/**

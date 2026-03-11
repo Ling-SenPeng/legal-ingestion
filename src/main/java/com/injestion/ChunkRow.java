@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 /**
  * Data class representing a chunk row from the database.

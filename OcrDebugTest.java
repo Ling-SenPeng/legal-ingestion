@@ -1,5 +1,5 @@
-import com.ingestion.PDFReader;
-import com.ingestion.TesseractOcrService;
+import com.injestion.PDFReader;
+import com.injestion.TesseractOcrService;
 
 import java.util.List;
 import java.util.Scanner;

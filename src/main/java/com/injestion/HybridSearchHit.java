@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 /**
  * Represents a hybrid search result combining vector and keyword search scores.

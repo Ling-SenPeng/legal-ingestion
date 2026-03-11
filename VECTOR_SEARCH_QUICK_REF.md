@@ -15,44 +15,44 @@ docker-compose up -d
 
 ## Commands
 
-### Ingest PDFs
+### injest PDFs
 ```bash
 # Default directory from config.properties
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
 
 # Custom directory
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdfs"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest /path/to/pdfs"
 ```
 
 ### Generate Embeddings
 ```bash
 # Default: limit=100
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing"
 
 # Specific limit (get 500 chunks)
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 500"
 
 # Custom batch size
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500 --batchSize 100"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 500 --batchSize 100"
 ```
 
 ### Search
 ```bash
 # Default topK=10
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'your search term'"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'your search term'"
 
 # Get top 20 results
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract' --topK 20"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'breach of contract' --topK 20"
 
 # Multi-word query (must use quotes)
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'payment terms and conditions' --topK 5"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'payment terms and conditions' --topK 5"
 ```
 
 ## Verify Progress
 
-### Check ingestion status
+### Check injestion status
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion \
   -c "SELECT count(*), status FROM pdf_documents GROUP BY status;"
 
 # Output:
@@ -64,7 +64,7 @@ docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
 
 ### Check embedding progress
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion \
   -c "SELECT 
        COUNT(*) as total_chunks,
        COUNT(CASE WHEN embedding IS NOT NULL THEN 1 END) as embedded,
@@ -79,7 +79,7 @@ docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
 
 ### Check recent search results
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion \
   -c "SELECT c.id, d.file_name, c.page_no, 
              LEFT(c.text, 50) as preview,
              c.embedding IS NOT NULL as has_embedding
@@ -105,7 +105,7 @@ docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
 | `OPENAI_API_KEY not set` | Add to `.env` file in project root |
 | `No results from search` | Run `embed-missing` first |
 | `PostgreSQL connection refused` | Start Docker: `docker-compose up -d` |
-| `vector type does not exist` | Run: `docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql` |
+| `vector type does not exist` | Run: `docker-compose exec -T postgres psql -U injestion_user -d legal_injestion < init.sql` |
 | `API rate limit exceeded` | Reduce `--limit` or wait before retrying |
 | `Out of memory` | Reduce `--limit` and `--batchSize` |
 

@@ -1,4 +1,4 @@
-# Legal Ingestion
+# Legal injestion
 
 A Java application to read and process PDF files from a directory, built with Maven.
 
@@ -63,22 +63,22 @@ A Java application to read and process PDF files from a directory, built with Ma
 
 2. **Run the application using default directory (from config.properties)**
    ```bash
-   mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
+   mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
    ```
 
 3. **Run the application with a custom directory path**
    ```bash
-   mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdf/directory"
+   mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest /path/to/pdf/directory"
    ```
    
    Example:
    ```bash
-   mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest ~/Documents/PDFs"
+   mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest ~/Documents/PDFs"
    ```
 
 4. **For development (using Maven with classpath)**
    ```bash
-   mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
+   mvn compile exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
    ```
    - Find all PDF files in the specified directory (or from config.properties)
    - Extract text content from each PDF by page
@@ -91,29 +91,29 @@ The application now supports semantic search using OpenAI embeddings and Postgre
 
 ### Commands
 
-#### 1. **ingest** - Process and store PDFs
+#### 1. **injest** - Process and store PDFs
 ```bash
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest [directory]"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest [directory]"
 ```
 Extracts text by page, stores in database with embeddings=NULL (ready for embedding generation).
 
 #### 2. **embed-missing** - Generate embeddings for chunks
 ```bash
 # Generate embeddings for all chunks without embeddings
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing"
 
 # Custom limit
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 200 --batchSize 50"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 200 --batchSize 50"
 ```
 **Requires:** Set `OPENAI_API_KEY` environment variable or add to `.env` file
 
 #### 3. **search** - Semantic search across PDFs
 ```bash
 # Basic search
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract'"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'breach of contract'"
 
 # Custom top-K results
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'liability' --topK 20"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'liability' --topK 20"
 ```
 **Requires:** Set `OPENAI_API_KEY` environment variable or add to `.env` file
 
@@ -128,14 +128,14 @@ echo 'OPENAI_API_KEY=sk-your-api-key' > .env
 # 2. Build the project
 mvn clean package
 
-# 3. Ingest PDFs (creates chunks with embedding=NULL)
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
+# 3. injest PDFs (creates chunks with embedding=NULL)
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
 
 # 4. Generate embeddings for all chunks
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 1000"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 1000"
 
 # 5. Search for documents
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'your search term' --topK 10"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'your search term' --topK 10"
 ```
 
 ## Configuration
@@ -143,21 +143,21 @@ mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --que
 The application reads the PDF directory and file size limits from `src/main/resources/config.properties`:
 
 ```properties
-pdf.ingestion.directory=/Users/ling-senpeng/Documents/divorce 2026
+pdf.injestion.directory=/Users/ling-senpeng/Documents/divorce 2026
 max.file.size=1048576
 ```
 
 **Priority order for directory selection:**
-1. Command-line argument: `mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp" -Dexec.args="/custom/path"`
+1. Command-line argument: `mvn compile exec:java -Dexec.mainClass="com.injestion.PDFinjestionApp" -Dexec.args="/custom/path"`
 2. Config file: `config.properties` (built into the JAR)
 3. Fallback default: Hardcoded in the code
 
 **Alternative (using Maven):**
-- `mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="/custom/path"`
+- `mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="/custom/path"`
 
-## 📋 MVP Level 1 - Page-based Chunking & Database Ingestion
+## 📋 MVP Level 1 - Page-based Chunking & Database injestion
 
-The ingestion pipeline now extracts PDF text by page and stores chunks in PostgreSQL with citation support.
+The injestion pipeline now extracts PDF text by page and stores chunks in PostgreSQL with citation support.
 
 ### Key Features (MVP Level 1)
 
@@ -170,7 +170,7 @@ The ingestion pipeline now extracts PDF text by page and stores chunks in Postgr
 - ✅ **Metadata storage**: JSONB metadata per chunk (extractor type, character count)
 - ⏳ **Embeddings**: NULL for MVP (ready for future OpenAI integration)
 
-### Run the Ingestion Pipeline
+### Run the injestion Pipeline
 
 #### 1. Ensure PostgreSQL is running (Docker):
 
@@ -179,10 +179,10 @@ The ingestion pipeline now extracts PDF text by page and stores chunks in Postgr
 docker-compose up -d
 
 # Initialize database schema
-docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
+docker-compose exec -T postgres psql -U injestion_user -d legal_injestion < init.sql
 
 # Verify tables are created
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c "\dt"
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c "\dt"
 ```
 
 Expected output:
@@ -190,28 +190,28 @@ Expected output:
                List of relations
  Schema |      Name      | Type  |       Owner       
 --------+----------------+-------+-------------------
- public | pdf_chunks     | table | ingestion_user
- public | pdf_documents  | table | ingestion_user
+ public | pdf_chunks     | table | injestion_user
+ public | pdf_documents  | table | injestion_user
 ```
 
-#### 2. Run the ingestion app:
+#### 2. Run the injestion app:
 
 **Using Maven:**
 ```bash
 # Default config.properties directory
 mvn clean package
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
 
 # Custom directory
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdfs"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest /path/to/pdfs"
 ```
 
 #### 3. Expected output:
 
 ```
-=== PDF Ingestion Pipeline (MVP Level 1) ===
+=== PDF injestion Pipeline (MVP Level 1) ===
 Input Directory: /Users/ling-senpeng/Documents/divorce 2026
-Database URL: jdbc:postgresql://localhost:5432/legal_ingestion
+Database URL: jdbc:postgresql://localhost:5432/legal_injestion
 
 Found 33 PDF file(s) in /Users/ling-senpeng/Documents/divorce 2026
 
@@ -223,7 +223,7 @@ Found 33 PDF file(s) in /Users/ling-senpeng/Documents/divorce 2026
   • Pages extracted: 5
   • Storing chunks with page citations...
   Inserted/updated 5 chunks
-  ✓ Success: 5 page(s) ingested
+  ✓ Success: 5 page(s) injested
 
 [2] Processing: document2.pdf
 ...
@@ -237,12 +237,12 @@ Total files encountered: 33
 
 ### Verify Results in Database
 
-After running the ingestion pipeline, verify the results:
+After running the injestion pipeline, verify the results:
 
 #### Check documents were stored:
 
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c \
   "SELECT id, file_name, sha256, status FROM pdf_documents LIMIT 5;"
 ```
 
@@ -258,7 +258,7 @@ Expected output:
 #### Check chunks by document ID (with page numbers):
 
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c \
   "SELECT id, page_no, chunk_index, LENGTH(text) as char_count, meta FROM pdf_chunks WHERE doc_id = 1 ORDER BY page_no;"
 ```
 
@@ -276,14 +276,14 @@ Expected output:
 #### Count total chunks:
 
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c \
   "SELECT COUNT(*) as total_chunks FROM pdf_chunks;"
 ```
 
 #### Get a specific page chunk for legal citation:
 
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c \
   "SELECT id, page_no, LEFT(text, 100) as preview FROM pdf_chunks WHERE doc_id = 1 AND page_no = 3;"
 ```
 
@@ -294,19 +294,19 @@ Expected output:
   3 |       3 | This is the text content from page 3 of the document. It contains...
 ```
 
-#### Idempotency check (run ingestion twice):
+#### Idempotency check (run injestion twice):
 
 First run processes new files, second run checks for duplicates:
 
 ```bash
 # First run
-mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+mvn clean compile exec:java -Dexec.mainClass="com.injestion.PDFinjestionApp"
 
 # Second run
-mvn clean compile exec:java -Dexec.mainClass="com.ingestion.PDFIngestionApp"
+mvn clean compile exec:java -Dexec.mainClass="com.injestion.PDFinjestionApp"
 
 # Check if documents are marked as existing
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c \
   "SELECT COUNT(*) FROM pdf_documents WHERE status = 'DONE';"
 ```
 
@@ -317,20 +317,20 @@ The second run should skip processing (or upsert existing chunks without duplica
 #### Get all documents by status:
 
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c \
   "SELECT id, file_name, file_size, status FROM pdf_documents WHERE status = 'DONE' ORDER BY processed_at DESC LIMIT 10;"
 ```
 
 #### Get failed documents with error messages:
 
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c \
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c \
   "SELECT id, file_name, status, error_msg FROM pdf_documents WHERE status = 'FAILED';"
 ```
 
 ### Document and Schema
 
-The ingestion pipeline performs these operations:
+The injestion pipeline performs these operations:
 
 1. Discover all PDF files in input directory (filter > 1MB)
 2. Calculate SHA256 hash of each PDF
@@ -386,20 +386,20 @@ If you need to manually initialize or re-initialize the database:
 
 **Simple command:**
 ```bash
-docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
+docker-compose exec -T postgres psql -U injestion_user -d legal_injestion < init.sql
 ```
 
 **Alternative methods:**
 
 1. **Using psql interactively:**
    ```bash
-   docker-compose exec postgres psql -U ingestion_user -d legal_ingestion
+   docker-compose exec postgres psql -U injestion_user -d legal_injestion
    # Then paste or run the contents of init.sql
    ```
 
 2. **Using heredoc:**
    ```bash
-   docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion << EOF
+   docker-compose exec -T postgres psql -U injestion_user -d legal_injestion << EOF
    $(cat init.sql)
    EOF
    ```
@@ -415,12 +415,12 @@ docker-compose ps
 
 **Check pgvector is installed:**
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extname FROM pg_extension WHERE extname = 'vector';"
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extname FROM pg_extension WHERE extname = 'vector';"
 ```
 
 **Check tables were created:**
 ```bash
-docker-compose exec postgres psql -U ingestion_user -d legal_ingestion -c "\dt"
+docker-compose exec postgres psql -U injestion_user -d legal_injestion -c "\dt"
 ```
 
 **Stop and clean up:**
@@ -468,16 +468,16 @@ The database schema (pgvector extension, tables, and indexes) is defined in `ini
 Add database connection details to `src/main/resources/config.properties`:
 
 ```properties
-# PDF Ingestion Directory Configuration
-pdf.ingestion.directory=/path/to/pdfs
+# PDF injestion Directory Configuration
+pdf.injestion.directory=/path/to/pdfs
 
 # Maximum file size to process (in bytes)
 max.file.size=1048576
 
 # Database Configuration
-db.url=jdbc:postgresql://localhost:5432/legal_ingestion
-db.user=ingestion_user
-db.password=ingestion_pass
+db.url=jdbc:postgresql://localhost:5432/legal_injestion
+db.user=injestion_user
+db.password=injestion_pass
 
 # Vector Search / Embeddings Configuration
 embeddings.enabled=true
@@ -503,12 +503,12 @@ export OPENAI_API_KEY="sk-override-value"  # This takes precedence over .env
 ## Project Structure
 
 ```
-legal-ingestion/
+legal-injestion/
 ├── src/
 │   ├── main/
-│   │   ├── java/com/ingestion/
+│   │   ├── java/com/injestion/
 │   │   │   ├── AppMain.java                (Main CLI entry point, subcommand routing)
-│   │   │   ├── PDFIngestionApp.java        (PDF ingestion pipeline)
+│   │   │   ├── PDFinjestionApp.java        (PDF injestion pipeline)
 │   │   │   ├── PDFReader.java              (PDF reading & text extraction)
 │   │   │   ├── DocumentRepo.java           (PDF document persistence)
 │   │   │   ├── ChunkRepo.java              (PDF chunk + embedding persistence)
@@ -523,7 +523,7 @@ legal-ingestion/
 │   │       ├── config.properties           (Configuration)
 │   │       └── application.properties
 │   └── test/
-│       └── java/com/ingestion/
+│       └── java/com/injestion/
 │           ├── PDFReaderTest.java          (PDF reader tests)
 │           └── HelloWorldTest.java         (Hello World tests)
 ├── docker-compose.yml                      (PostgreSQL + pgvector Docker setup)
@@ -557,18 +557,18 @@ mvn compile
 
 **Run Application (Development)**
 ```bash
-# Ingest PDFs (default config.properties directory)
-mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
+# injest PDFs (default config.properties directory)
+mvn compile exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
 
-# Ingest with custom directory
-mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest /path/to/pdfs"
+# injest with custom directory
+mvn compile exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest /path/to/pdfs"
 
 # Generate embeddings (requires OPENAI_API_KEY in .env or environment variable)
-mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
+mvn compile exec:java -Dexec.mainClass="com.injestion.AppMain" \
   -Dexec.args="embed-missing --limit 100"
 
 # Search (requires OPENAI_API_KEY in .env or environment variable)
-mvn compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
+mvn compile exec:java -Dexec.mainClass="com.injestion.AppMain" \
   -Dexec.args='search --query "your search" --topK 10'
 ```
 
@@ -579,7 +579,7 @@ mvn test -DargLine="-Xmx1024m"
 
 ## Features
 
-### PDF Ingestion (ingest command)
+### PDF injestion (injest command)
 - **Find all PDF files** in a given directory (including subdirectories)
 - **Extract text by page** from PDF files using PDFBox (1-based page numbering for legal citations)
 - **Calculate SHA256 hash** for content deduplication  
@@ -605,14 +605,14 @@ mvn test -DargLine="-Xmx1024m"
 ### Example Usage - Command Line
 
 ```bash
-# 1. Ingest PDFs
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest ~/Documents/PDFs"
+# 1. injest PDFs
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest ~/Documents/PDFs"
 
 # 2. Generate embeddings for 200 chunks (requires .env with OPENAI_API_KEY)
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 200"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 200"
 
 # 3. Search for documents
-mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'contract terms' --topK 10"
+mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'contract terms' --topK 10"
 ```
 
 ### Example Usage - Programmatic (Java)

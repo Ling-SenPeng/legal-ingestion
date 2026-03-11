@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 import java.io.InputStream;
 import java.sql.DriverManager;
@@ -6,7 +6,7 @@ import java.util.Properties;
 
 /**
  * Main application entry point supporting multiple subcommands.
- * Subcommands: ingest, embed-missing, search
+ * Subcommands: injest, embed-missing, search
  */
 public class AppMain {
 
@@ -25,8 +25,8 @@ public class AppMain {
 
 		try {
 			switch (command) {
-				case "ingest":
-					runIngestion(args);
+				case "injest":
+					runinjestion(args);
 					break;
 
 				case "embed-missing":
@@ -53,11 +53,11 @@ public class AppMain {
 		}
 	}
 
-	private static void runIngestion(String[] args) throws Exception {
-		// Delegate to PDFIngestionApp (was the old main)
-		String[] ingestArgs = new String[args.length - 1];
-		System.arraycopy(args, 1, ingestArgs, 0, args.length - 1);
-		PDFIngestionApp.main(ingestArgs);
+	private static void runinjestion(String[] args) throws Exception {
+		// Delegate to PDFinjestionApp (was the old main)
+		String[] injestArgs = new String[args.length - 1];
+		System.arraycopy(args, 1, injestArgs, 0, args.length - 1);
+		PDFinjestionApp.main(injestArgs);
 	}
 
 	private static void runEmbedMissing(String[] args) throws Exception {
@@ -79,9 +79,9 @@ public class AppMain {
 
 		// Load config
 		Properties props = loadConfig();
-		String dbUrl = props.getProperty("db.url", "jdbc:postgresql://localhost:5432/legal_ingestion");
-		String dbUser = props.getProperty("db.user", "ingestion_user");
-		String dbPassword = props.getProperty("db.password", "ingestion_pass");
+		String dbUrl = props.getProperty("db.url", "jdbc:postgresql://localhost:5432/legal_injestion");
+		String dbUser = props.getProperty("db.user", "injestion_user");
+		String dbPassword = props.getProperty("db.password", "injestion_pass");
 
 		// Get OpenAI API key from environment
 		String apiKey = OpenAIEmbeddingClient.getApiKeyFromEnv();
@@ -110,15 +110,15 @@ public class AppMain {
 
 		if (query == null || query.trim().isEmpty()) {
 			System.err.println("Error: --query parameter is required");
-			System.err.println("Usage: java -jar legal-ingestion.jar search --query \"your query\" [--topK 10]");
+			System.err.println("Usage: java -jar legal-injestion.jar search --query \"your query\" [--topK 10]");
 			System.exit(1);
 		}
 
 		// Load config
 		Properties props = loadConfig();
-		String dbUrl = props.getProperty("db.url", "jdbc:postgresql://localhost:5432/legal_ingestion");
-		String dbUser = props.getProperty("db.user", "ingestion_user");
-		String dbPassword = props.getProperty("db.password", "ingestion_pass");
+		String dbUrl = props.getProperty("db.url", "jdbc:postgresql://localhost:5432/legal_injestion");
+		String dbUser = props.getProperty("db.user", "injestion_user");
+		String dbPassword = props.getProperty("db.password", "injestion_pass");
 
 		// Get OpenAI API key from environment
 		String apiKey = OpenAIEmbeddingClient.getApiKeyFromEnv();
@@ -165,9 +165,9 @@ public class AppMain {
 
 		// Load config
 		Properties props = loadConfig();
-		String dbUrl = props.getProperty("db.url", "jdbc:postgresql://localhost:5432/legal_ingestion");
-		String dbUser = props.getProperty("db.user", "ingestion_user");
-		String dbPassword = props.getProperty("db.password", "ingestion_pass");
+		String dbUrl = props.getProperty("db.url", "jdbc:postgresql://localhost:5432/legal_injestion");
+		String dbUser = props.getProperty("db.user", "injestion_user");
+		String dbPassword = props.getProperty("db.password", "injestion_pass");
 
 		// Get OpenAI API key from environment
 		String apiKey = OpenAIEmbeddingClient.getApiKeyFromEnv();
@@ -202,10 +202,10 @@ public class AppMain {
 	}
 
 	private static void printUsage() {
-		System.out.println("=== Legal Ingestion Tool ===");
+		System.out.println("=== Legal injestion Tool ===");
 		System.out.println();
 		System.out.println("Usage:");
-		System.out.println("  mvn exec:java -Dexec.args=\"ingest [directory] [dbUrl] [dbUser] [dbPassword]\"");
+		System.out.println("  mvn exec:java -Dexec.args=\"injest [directory] [dbUrl] [dbUser] [dbPassword]\"");
 		System.out.println("  mvn exec:java -Dexec.args=\"embed-missing [--limit 100] [--batchSize 50]\"");
 		System.out.println("  mvn exec:java -Dexec.args=\"search --query \\\"your search\\\" [--topK 10]\"");
 		System.out.println("  mvn exec:java -Dexec.args=\"hybrid-search --query \\\"your search\\\" [--topK 10] [--vectorTopN 20] [--keywordTopN 20] [--alpha 0.7]\"");

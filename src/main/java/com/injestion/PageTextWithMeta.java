@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 import java.util.HashMap;
 import java.util.Map;

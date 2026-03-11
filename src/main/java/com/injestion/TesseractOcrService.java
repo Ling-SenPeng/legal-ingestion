@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;

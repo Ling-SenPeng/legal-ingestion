@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 import java.io.BufferedReader;
 import java.io.File;

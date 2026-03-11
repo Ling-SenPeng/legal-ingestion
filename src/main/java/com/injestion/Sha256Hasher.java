@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 import java.io.File;
 import java.io.FileInputStream;

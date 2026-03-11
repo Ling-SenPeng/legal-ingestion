@@ -60,7 +60,7 @@ The project has logging configuration files that automatically suppress this war
 
 **Using the built JAR (Recommended):**
 ```bash
-java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar
+java -jar target/legal-injestion-0.0.1-SNAPSHOT.jar
 # JBIG2 warning will NOT appear
 ```
 
@@ -237,10 +237,10 @@ When prompted, provide the path to MC-30-1.pdf.
 mvn clean package -q
 
 # Compile debug test
-javac -cp "target/classes:target/legal-ingestion-0.0.1-SNAPSHOT.jar" OcrDebugTest.java
+javac -cp "target/classes:target/legal-injestion-0.0.1-SNAPSHOT.jar" OcrDebugTest.java
 
 # Run with your PDF
-java -cp "target/classes:target/legal-ingestion-0.0.1-SNAPSHOT.jar:." OcrDebugTest
+java -cp "target/classes:target/legal-injestion-0.0.1-SNAPSHOT.jar:." OcrDebugTest
 ```
 
 ---

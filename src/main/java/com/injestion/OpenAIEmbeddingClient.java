@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

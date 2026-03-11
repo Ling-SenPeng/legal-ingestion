@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 public class HelloWorld {
 

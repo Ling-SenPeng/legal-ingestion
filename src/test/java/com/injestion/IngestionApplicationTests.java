@@ -1,4 +1,4 @@
-package com.ingestion;
+package com.injestion;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

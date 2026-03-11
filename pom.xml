@@ -2,11 +2,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>com.ingestion</groupId>
-	<artifactId>legal-ingestion</artifactId>
+	<groupId>com.injestion</groupId>
+	<artifactId>legal-injestion</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>legal-ingestion</name>
-	<description>Legal Document Ingestion</description>
+	<name>legal-injestion</name>
+	<description>Legal Document injestion</description>
 	<properties>
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>
@@ -53,7 +53,7 @@
 				<artifactId>exec-maven-plugin</artifactId>
 				<version>3.6.3</version>
 				<configuration>
-					<mainClass>com.ingestion.AppMain</mainClass>
+					<mainClass>com.injestion.AppMain</mainClass>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -63,13 +63,13 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>com.ingestion.AppMain</mainClass>
+							<mainClass>com.injestion.AppMain</mainClass>
 						</manifest>
 					</archive>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
-					<finalName>legal-ingestion-0.0.1-SNAPSHOT</finalName>
+					<finalName>legal-injestion-0.0.1-SNAPSHOT</finalName>
 					<appendAssemblyId>false</appendAssemblyId>
 				</configuration>
 				<executions>

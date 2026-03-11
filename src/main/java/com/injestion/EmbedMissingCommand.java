@@ -77,7 +77,16 @@ public class EmbedMissingCommand {
 
 				} catch (Exception e) {
 					failureCount++;
-					System.err.println("  ✗ Error embedding chunkId=" + chunk.id + ": " + e.getMessage());
+					String errorMsg = e.getMessage();
+					System.err.println("  ✗ Error embedding chunkId=" + chunk.id + ": " + errorMsg);
+
+					// Log preview of problematic chunk for debugging
+					if (errorMsg != null && errorMsg.contains("invalid")) {
+						String preview = chunk.text.length() > 200 ?
+							chunk.text.substring(0, 200) + "..." : chunk.text;
+						System.err.println("    Preview: " + preview);
+						System.err.println("    Text length: " + chunk.text.length());
+					}
 					// Continue with next chunk (resilient to errors)
 				}
 			}

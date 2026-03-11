@@ -2,6 +2,7 @@ package com.injestion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -52,12 +53,11 @@ public class OpenAIEmbeddingClient {
 			trimmedText = trimmedText.substring(0, MAX_TEXT_LENGTH);
 		}
 
-		// Build request payload
-		String payload = String.format(
-			"{\"model\": \"%s\", \"input\": %s}",
-			MODEL,
-			objectMapper.writeValueAsString(trimmedText)
-		);
+		// Build request payload using ObjectMapper for proper JSON serialization
+		ObjectNode requestBody = objectMapper.createObjectNode();
+		requestBody.put("model", MODEL);
+		requestBody.put("input", trimmedText);
+		String payload = objectMapper.writeValueAsString(requestBody);
 
 		// Create HTTP request
 		HttpRequest request = HttpRequest.newBuilder()

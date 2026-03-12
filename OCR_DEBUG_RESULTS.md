@@ -53,7 +53,7 @@ This is **non-critical** - the pipeline will continue processing other images.
 - The warning will not appear in console output
 
 **If you still see the warning:**
-- Ensure you're running from the built JAR with `java -jar target/legal-injestion-0.0.1-SNAPSHOT.jar`
+- Ensure you're running from the built JAR with `java -jar target/legal-ingestion-0.0.1-SNAPSHOT.jar`
 - Or check your logging configuration in your IDE/execution environment
 
 For advanced users who need JBIG2 image processing support, see [OCR_DEBUG_GUIDE.md](OCR_DEBUG_GUIDE.md#optional-jbig2-image-support).

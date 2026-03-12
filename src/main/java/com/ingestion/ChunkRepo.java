@@ -1,4 +1,4 @@
-package com.injestion;
+package com.ingestion;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -6,7 +6,7 @@ import java.sql.ResultSet;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
-import com.injestion.PDFReader.PageText;
+import com.ingestion.PDFReader.PageText;
 
 /**
  * Repository for PDF chunks (pages) persistence.

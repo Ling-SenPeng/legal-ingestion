@@ -1,4 +1,4 @@
-package com.injestion;
+package com.ingestion;
 
 import java.sql.Connection;
 import java.util.*;

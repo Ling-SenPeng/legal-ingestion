@@ -6,7 +6,7 @@
 # processing the MC-30-1.pdf file.
 #
 # SETUP:
-# 1. Place MC-30-1.pdf in the injestion project root directory, OR
+# 1. Place MC-30-1.pdf in the ingestion project root directory, OR
 # 2. Run this script and provide the full path when prompted
 #
 # REQUIREMENTS:
@@ -43,13 +43,13 @@ mvn clean package -q
 
 # Compile debug test
 echo "[2/3] Compiling debug test..."
-javac -cp "target/classes:target/legal-injestion-0.0.1-SNAPSHOT.jar" OcrDebugTest.java
+javac -cp "target/classes:target/legal-ingestion-0.0.1-SNAPSHOT.jar" OcrDebugTest.java
 
 # Run debug test
 echo "[3/3] Running OCR debug pipeline..."
 echo ""
 
-java -cp "target/classes:target/legal-injestion-0.0.1-SNAPSHOT.jar:." OcrDebugTest
+java -cp "target/classes:target/legal-ingestion-0.0.1-SNAPSHOT.jar:." OcrDebugTest
 
 echo ""
 echo "================================================================================================"

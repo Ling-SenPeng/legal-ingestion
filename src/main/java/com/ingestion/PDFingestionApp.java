@@ -1,4 +1,4 @@
-package com.injestion;
+package com.ingestion;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * Main application to injest PDF files: extract text by page, calculate SHA256,
+ * Main application to ingest PDF files: extract text by page, calculate SHA256,
  * and persist to PostgreSQL database with page-level chunking (citation-aware).
  *
  * MVP Level 1 optimizations:
@@ -20,17 +20,17 @@ import java.util.Properties;
  * - Error-aware: reuse SHA256 hash, no redundant calculations
  *
  * Usage:
- *   mvn compile exec:java -Dexec.mainClass="com.injestion.PDFinjestionApp"
- *   mvn compile exec:java -Dexec.mainClass="com.injestion.PDFinjestionApp" \
+ *   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFingestionApp"
+ *   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFingestionApp" \
  *       -Dexec.args="/path/to/pdfs jdbc:postgresql://localhost:5432/db user pass"
  */
-public class PDFinjestionApp {
+public class PDFingestionApp {
 
 	private static final String CONFIG_FILE = "config.properties";
 	private static final String DEFAULT_DIRECTORY = "/Users/ling-senpeng/Documents/divorce 2026";
-	private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/legal_injestion";
-	private static final String DEFAULT_DB_USER = "injestion_user";
-	private static final String DEFAULT_DB_PASSWORD = "injestion_pass";
+	private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/legal_ingestion";
+	private static final String DEFAULT_DB_USER = "ingestion_user";
+	private static final String DEFAULT_DB_PASSWORD = "ingestion_pass";
 
 	public static void main(String[] args) {
 		// Parse command-line arguments or load from config
@@ -56,7 +56,7 @@ public class PDFinjestionApp {
 		Properties props = loadConfig();
 		if (props != null) {
 			if (args.length == 0) {
-				directoryPath = props.getProperty("pdf.injestion.directory", directoryPath);
+				directoryPath = props.getProperty("pdf.ingestion.directory", directoryPath);
 			}
 			dbUrl = props.getProperty("db.url", dbUrl);
 			dbUser = props.getProperty("db.user", dbUser);
@@ -66,7 +66,7 @@ public class PDFinjestionApp {
 		// Ensure database driver is loaded
 		DocumentRepo.ensureDriverLoaded();
 
-		System.out.println("=== PDF injestion Pipeline (MVP Level 1) ===");
+		System.out.println("=== PDF ingestion Pipeline (MVP Level 1) ===");
 		System.out.println("Input Directory: " + directoryPath);
 		System.out.println("Database URL: " + dbUrl);
 		System.out.println();
@@ -124,7 +124,7 @@ public class PDFinjestionApp {
 
 						// Mark as done (same connection)
 						DocumentRepo.markDone(conn, docId);
-						System.out.println("  ✓ Success: " + pages.size() + " page(s) injested");
+						System.out.println("  ✓ Success: " + pages.size() + " page(s) ingested");
 						processedCount++;
 					}
 
@@ -171,7 +171,7 @@ public class PDFinjestionApp {
 	 */
 	private static Properties loadConfig() {
 		Properties properties = new Properties();
-		try (InputStream input = PDFinjestionApp.class.getClassLoader().getResourceAsStream(CONFIG_FILE)) {
+		try (InputStream input = PDFingestionApp.class.getClassLoader().getResourceAsStream(CONFIG_FILE)) {
 			if (input != null) {
 				properties.load(input);
 				return properties;

@@ -1,4 +1,4 @@
-package com.injestion;
+package com.ingestion;
 
 /**
  * Data class representing a search hit from vector similarity search.

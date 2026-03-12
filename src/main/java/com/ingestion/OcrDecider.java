@@ -1,4 +1,4 @@
-package com.injestion;
+package com.ingestion;
 
 /**
  * OcrDecider provides MVP logic to determine whether a page needs OCR processing.

@@ -1,4 +1,4 @@
-package com.injestion;
+package com.ingestion;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;

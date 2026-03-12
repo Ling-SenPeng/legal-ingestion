@@ -2,7 +2,7 @@
 
 ## ✅ Implementation Complete
 
-All vector search features have been successfully implemented and integrated into the PDF injestion system.
+All vector search features have been successfully implemented and integrated into the PDF ingestion system.
 
 **Commit History:**
 - `310791f` - Add vector search: embed-missing and search commands with OpenAI integration (9 files)
@@ -14,7 +14,7 @@ All vector search features have been successfully implemented and integrated int
 
 #### 1. **embed-missing** - Generate embeddings for offline chunks
 ```bash
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing [--limit 100] [--batchSize 50]"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing [--limit 100] [--batchSize 50]"
 ```
 - Fetches chunks with NULL embeddings from PostgreSQL
 - Calls OpenAI text-embedding-3-small API (1536 dimensions)
@@ -24,7 +24,7 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missin
 
 #### 2. **search** - Semantic search via vector similarity
 ```bash
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query '...' [--topK 10]"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query '...' [--topK 10]"
 ```
 - Generates embedding for user query (OpenAI)
 - Performs pgvector cosine distance search
@@ -35,14 +35,14 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --que
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    PDFinjestionApp                      │
+│                    PDFingestionApp                      │
 │        (Extract text by page → PostgreSQL)             │
 └───────────────────┬─────────────────────────────────────┘
                     │
         ┌───────────┼───────────┐
         │           │           │
         ▼           ▼           ▼
-    [injest]  [embed-missing]  [search]
+    [ingest]  [embed-missing]  [search]
         │           │           │
         │    ┌──────┴──────┐    │
         │    │ OpenAI API  │    │
@@ -69,7 +69,7 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --que
 
 2. **AppMain.java** (130 lines)
    - Main entry point with subcommand routing
-   - Delegates to: injest, embed-missing, search
+   - Delegates to: ingest, embed-missing, search
    - Parses command-line arguments
    - Loads config.properties settings
 
@@ -98,7 +98,7 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --que
 
 2. **pom.xml** (+5 lines)
    - Added jackson-databind-2.16.1 for JSON serialization
-   - Changed mainClass to com.injestion.AppMain
+   - Changed mainClass to com.ingestion.AppMain
 
 3. **config.properties** (+3 lines)
    - Updated embeddings configuration notes
@@ -175,7 +175,7 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --que
 ✅ Error handling and resilience
 ✅ Configuration from config.properties
 ✅ OpenAI API key from environment variable
-✅ Backward compatibility maintained (injest still works)
+✅ Backward compatibility maintained (ingest still works)
 ✅ Database schema unchanged (embedding column already existed)
 ✅ Code compiles and tests pass
 ✅ Committed to git and pushed to GitHub
@@ -210,29 +210,29 @@ echo 'OPENAI_API_KEY=sk-your-key-here' > .env
 mvn clean package
 ```
 
-### Step 2: injest PDFs
+### Step 2: ingest PDFs
 ```bash
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 ```
 Creates pdf_documents and pdf_chunks with embedding=NULL
 
 ### Step 3: Generate Embeddings
 ```bash
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 500"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500"
 ```
 Fetches chunks, calls OpenAI API, stores embeddings
 
 ### Step 4: Search
 ```bash
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'breach of contract' --topK 10"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract' --topK 10"
 ```
 Returns semantic search results with legal citations
 
 ## 🔄 Backward Compatibility
 
 ✅ **All existing functionality preserved:**
-- PDFinjestionApp still available for direct use
-- `injest` command works via `AppMain injest` delegation
+- PDFingestionApp still available for direct use
+- `ingest` command works via `AppMain ingest` delegation
 - Database schema unchanged (no breaking migrations)
 - All tests still pass
 - No changes to PDF processing logic

@@ -1,4 +1,4 @@
-package com.injestion;
+package com.ingestion;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

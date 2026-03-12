@@ -2,10 +2,10 @@
 
 ### Overview
 
-Added full vector search capability to the PDF injestion system using OpenAI embeddings (1536-dimensional) and PostgreSQL pgvector. The system now supports two new commands:
+Added full vector search capability to the PDF ingestion system using OpenAI embeddings (1536-dimensional) and PostgreSQL pgvector. The system now supports two new commands:
 
 1. **embed-missing** - Batch generate and store embeddings for chunks missing embeddings
-2. **search** - Semantic search across injested PDFs using vector similarity
+2. **search** - Semantic search across ingested PDFs using vector similarity
 
 ### Architecture
 
@@ -32,7 +32,7 @@ PostgreSQL pgvector + custom SQL with cosine distance
 
 #### 2. **AppMain.java**
 - Main entry point with subcommand routing
-- Supports: `injest`, `embed-missing`, `search`
+- Supports: `ingest`, `embed-missing`, `search`
 - Loads configuration from `config.properties`
 - Handles command-line arguments parsing
 
@@ -82,7 +82,7 @@ LIMIT ?;
 
 #### 2. **pom.xml**
 - Added `jackson-databind:2.16.1` for JSON serialization
-- Changed mainClass from `PDFinjestionApp` to `AppMain`
+- Changed mainClass from `PDFingestionApp` to `AppMain`
 
 #### 3. **config.properties**
 - Updated embeddings configuration
@@ -102,10 +102,10 @@ mvn clean package
 #### 1. Embed Missing Embeddings
 ```bash
 # Generate embeddings for all chunks without embeddings (default: limit=100)
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing"
 
 # Custom limits
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 200 --batchSize 50"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 200 --batchSize 50"
 ```
 
 **Output:**
@@ -128,10 +128,10 @@ Elapsed time: 12.34s
 #### 2. Semantic Search
 ```bash
 # Basic search (default topK=10)
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'breach of contract'"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach of contract'"
 
 # Custom top-K
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'liability' --topK 20"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'liability' --topK 20"
 ```
 
 **Output:**
@@ -216,25 +216,25 @@ WITH (lists = 100);
 
 #### Test 1: Full pipeline with embeddings
 ```bash
-# 1. injest PDFs (creates chunks with NULL embeddings)
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
+# 1. ingest PDFs (creates chunks with NULL embeddings)
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
 # 2. Generate embeddings (requires .env with OPENAI_API_KEY)
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 1000"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 1000"
 
 # 3. Verify in database
-docker-compose exec postgres psql -U injestion_user -d legal_injestion \
+docker-compose exec postgres psql -U ingestion_user -d legal_ingestion \
   -c "SELECT COUNT(*) FROM pdf_chunks WHERE embedding IS NOT NULL;"
 # Should show: count = (number of successfully embedded chunks)
 
 # 4. Search
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'legal term here' --topK 10"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'legal term here' --topK 10"
 ```
 
 #### Test 2: Error resilience
 ```bash
 # Verify failed chunks are printed but process continues
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 50"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 50"
 
 # Output should show individual failures printed but final summary shows attempts
 ```
@@ -242,9 +242,9 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missin
 #### Test 3: Search quality
 ```bash
 # Test multiple queries with different strategies
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'contract' --topK 5"
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'payment terms' --topK 10"
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'breach liability damages' --topK 20"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'contract' --topK 5"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'payment terms' --topK 10"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'breach liability damages' --topK 20"
 
 # Verify results match expected legal context
 ```
@@ -252,10 +252,10 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --que
 ### Backward Compatibility
 
 ✅ **No breaking changes:**
-- Existing `injest` command still works via `AppMain injest` delegation
+- Existing `ingest` command still works via `AppMain ingest` delegation
 - Database schema unchanged (embedding column already existed)
 - All existing PDF processing logic intact
-- PDFinjestionApp still available for direct use
+- PDFingestionApp still available for direct use
 
 ### Future Enhancements
 
@@ -293,15 +293,15 @@ mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --que
 
 ```bash
 # Development/Testing
-mvn clean compile exec:java -Dexec.mainClass="com.injestion.AppMain" \
+mvn clean compile exec:java -Dexec.mainClass="com.ingestion.AppMain" \
   -Dexec.args="search --query test"
 
 # Production build
 mvn clean package
 
 # Run commands (requires .env with OPENAI_API_KEY)
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="embed-missing --limit 500"
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="search --query 'term' --topK 20"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="embed-missing --limit 500"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="search --query 'term' --topK 20"
 ```
 
 ### Git Commit Info

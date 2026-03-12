@@ -9,7 +9,7 @@
 
 1. **DocumentRepo.java** - Refactored to stateless repository with single UPSERT SQL
 2. **ChunkRepo.java** - Refactored to stateless repository accepting Connection parameter
-3. **PDFinjestionApp.java** - Rewritten pipeline with optimal error handling and connection management
+3. **PDFingestionApp.java** - Rewritten pipeline with optimal error handling and connection management
 
 ---
 
@@ -86,7 +86,7 @@ public int insertPageChunks(...) throws Exception {
 
 **After:**
 ```java
-// In PDFinjestionApp main loop - one connection per PDF:
+// In PDFingestionApp main loop - one connection per PDF:
 try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
     // Reuse same connection for all operations:
     
@@ -239,28 +239,28 @@ DocumentRepo.markFailed(conn, docId, errorMsg);
 - [x] `mvn clean package` → BUILD SUCCESS
 - [x] All 5 tests passing
 - [x] No compiler warnings (except JDK location)
-- [x] JAR artifact created: `legal-injestion-0.0.1-SNAPSHOT.jar`
+- [x] JAR artifact created: `legal-ingestion-0.0.1-SNAPSHOT.jar`
 
 ### Test Scenarios (Ready to test)
 
-**Scenario 1: Fresh injestion**
+**Scenario 1: Fresh ingestion**
 ```bash
 # Start fresh database
 docker-compose down -v
 docker-compose up -d
-docker-compose exec -T postgres psql -U injestion_user -d legal_injestion < init.sql
+docker-compose exec -T postgres psql -U ingestion_user -d legal_ingestion < init.sql
 
-# Build and run injestion
+# Build and run ingestion
 mvn clean package
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
 # Expected: All PDFs processed, status=DONE, chunks created with page_no
 ```
 
 **Scenario 2: Re-run (idempotency)**
 ```bash
-# Run injestion again
-mvn exec:java -Dexec.mainClass="com.injestion.AppMain" -Dexec.args="injest"
+# Run ingestion again
+mvn exec:java -Dexec.mainClass="com.ingestion.AppMain" -Dexec.args="ingest"
 
 # Expected: 
 # - Existing PDFs updated (file_path, file_size synced)
@@ -313,7 +313,7 @@ This optimization brings us closer to production readiness:
 
 **Commit:** `23e81f9`
 **Message:** Optimize MVP L1: Single UPSERT, minimal DB connections, error-aware
-**Files Changed:** 3 (DocumentRepo.java, ChunkRepo.java, PDFinjestionApp.java)
+**Files Changed:** 3 (DocumentRepo.java, ChunkRepo.java, PDFingestionApp.java)
 **Lines Added/Removed:** ~100 added, ~120 removed (net -20 lines)
 
 **Push Status:** ✅ Pushed to origin/main
@@ -322,7 +322,7 @@ This optimization brings us closer to production readiness:
 
 ## ✨ Summary
 
-The MVP Level 1 injestion pipeline is now optimized for:
+The MVP Level 1 ingestion pipeline is now optimized for:
 - **Performance**: Fewer DB connections and SQL roundtrips
 - **Reliability**: Error-aware handling with minimal redundant I/O
 - **Maintainability**: Stateless repositories, clear code paths

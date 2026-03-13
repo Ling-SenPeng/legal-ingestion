@@ -120,8 +120,8 @@ public class PaddleOcrService implements OcrProvider {
 			System.err.println("    [PaddleOCR] Page " + (pageIndex + 1) + ": Rendered in " + renderTime + "ms");
 
 			// Step 2: Save to temporary JPEG
-			System.err.println("    [PaddleOCR] Page " + (pageIndex + 1) + ": Saving image to temp file...");
 			tempImagePath = Files.createTempFile("paddle_ocr_", ".jpg");
+			System.err.println("    [PaddleOCR] Page " + (pageIndex + 1) + ": Saving image to temp file...: " + tempImagePath);
 			ImageIO.write(image, "jpg", tempImagePath.toFile());
 
 			// Step 3: Call Python helper script

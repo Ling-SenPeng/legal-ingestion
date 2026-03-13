@@ -115,4 +115,41 @@ public class DocumentRepo {
 		}
 		return null;
 	}
+
+	/**
+	 * Find a document by SHA256 and return its ID and status.
+	 * This is used to skip already-processed PDFs.
+	 *
+	 * @param conn the database connection
+	 * @param sha256 the SHA256 hash
+	 * @return a DocumentInfo object with id and status, or null if not found
+	 * @throws Exception if a database error occurs
+	 */
+	public static DocumentInfo findBySha256(Connection conn, String sha256) throws Exception {
+		String sql = "SELECT id, status FROM pdf_documents WHERE sha256 = ?";
+		try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+			stmt.setString(1, sha256);
+			try (ResultSet rs = stmt.executeQuery()) {
+				if (rs.next()) {
+					long id = rs.getLong("id");
+					String status = rs.getString("status");
+					return new DocumentInfo(id, status);
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Simple container for document lookup results.
+	 */
+	public static class DocumentInfo {
+		public final long id;
+		public final String status;
+
+		public DocumentInfo(long id, String status) {
+			this.id = id;
+			this.status = status;
+		}
+	}
 }

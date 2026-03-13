@@ -107,6 +107,15 @@ public class PDFingestionApp {
 
 					// Open connection for this PDF and reuse it
 					try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
+						// Check if document with same SHA256 already exists and is DONE
+						DocumentRepo.DocumentInfo existing = DocumentRepo.findBySha256(conn, sha256);
+						if (existing != null && "DONE".equals(existing.status)) {
+							System.out.println("  ✓ Already processed (SHA256 match, ID: " + existing.id + ")");
+							skippedCount++;
+							System.out.println();
+							continue;
+						}
+
 						// Upsert document and get ID (sets status = 'PROCESSING')
 						System.out.println("  • Upserting document record...");
 						docId = DocumentRepo.upsertAndGetId(conn, fileName, filePath, sha256, fileSize);

@@ -21,35 +21,61 @@ import java.util.Properties;
  * 
  * Supports OCR for scanned/image-based pages:
  * - Automatically detects pages needing OCR (< 30 chars text)
- * - Renders pages to images and calls tesseract
+ * - Uses pluggable OcrProvider (tesseract, PaddleOCR, etc.)
+ * - Preserves layout metadata and confidence scores
  * - Records OCR metadata in page output
  */
 public class PDFReader {
 
 	private static final String CONFIG_FILE = "config.properties";
-	private TesseractOcrService ocrService;  // Lazy-initialized OCR service
+	private static final String DEFAULT_OCR_PROVIDER = "auto";  // auto-detect or use configured provider
+	
+	private OcrProvider ocrProvider;  // Pluggable OCR provider
+	private String configuredProviderName;  // From config.properties
 
 	public PDFReader() {
-		this.ocrService = null;  // Lazy init on first OCR need
+		this.ocrProvider = null;  // Lazy init on first OCR need
+		this.configuredProviderName = loadConfiguredOcrProvider();
 	}
 
 	/**
-	 * Get or initialize the OCR service (lazy initialization).
-	 * 
-	 * @param threadPoolSize number of concurrent OCR threads
-	 * @return the OCR service, or null if tesseract is not available
+	 * Load the configured OCR provider name from config.properties.
+	 * Falls back to DEFAULT_OCR_PROVIDER if not configured.
+	 *
+	 * @return the configured provider name or default
 	 */
-	private synchronized TesseractOcrService getOcrService(int threadPoolSize) {
-		if (ocrService == null) {
-			if (TesseractOcrService.isTesseractAvailable()) {
-				ocrService = new TesseractOcrService(threadPoolSize);
-				System.out.println("    [OCR] Tesseract initialized with " + threadPoolSize + " threads");
-			} else {
-				System.out.println("    [OCR] WARNING: Tesseract not available. Scanned pages will not be OCR'd.");
-				return null;  // Tesseract not available
+	private String loadConfiguredOcrProvider() {
+		try {
+			InputStream in = PDFReader.class.getClassLoader().getResourceAsStream(CONFIG_FILE);
+			if (in != null) {
+				Properties props = new Properties();
+				props.load(in);
+				String provider = props.getProperty("ocr.provider", DEFAULT_OCR_PROVIDER);
+				in.close();
+				return provider;
+			}
+		} catch (IOException e) {
+			System.err.println("    [Config] Could not load " + CONFIG_FILE + ": " + e.getMessage());
+		}
+		return DEFAULT_OCR_PROVIDER;
+	}
+
+	/**
+	 * Get or initialize the OCR provider (lazy initialization).
+	 * Uses OcrProviderFactory to select the best available provider.
+	 * 
+	 * @return the OCR provider, or null if no provider is available
+	 */
+	private synchronized OcrProvider getOcrProvider() {
+		if (ocrProvider == null) {
+			Path projectRoot = Paths.get(".");  // Use current directory as project root
+			ocrProvider = OcrProviderFactory.selectProvider(configuredProviderName, projectRoot);
+			
+			if (ocrProvider == null) {
+				System.out.println("    [OCR] WARNING: No OCR provider available. Scanned pages will not be OCR'd.");
 			}
 		}
-		return ocrService;
+		return ocrProvider;
 	}
 
 	/**
@@ -76,10 +102,25 @@ public class PDFReader {
 	}
 
 	/**
-	 * Get OCR service for manual use (if needed).
+	 * Get OCR provider for manual use (if needed).
+	 * Backward compatibility method - now returns the OcrProvider.
+	 */
+	public OcrProvider getOcrProviderIfAvailable() {
+		return getOcrProvider();
+	}
+
+	/**
+	 * Legacy method - Get Tesseract service specifically (for backward compatibility).
+	 * This will return a TesseractOcrService if the current provider is tesseract, or null otherwise.
+	 *
+	 * @return TesseractOcrService if available, null otherwise
 	 */
 	public TesseractOcrService getOcrServiceIfAvailable() {
-		return getOcrService(2);
+		OcrProvider provider = getOcrProvider();
+		if (provider instanceof TesseractOcrService) {
+			return (TesseractOcrService) provider;
+		}
+		return null;
 	}
 
 	/**
@@ -157,7 +198,7 @@ public class PDFReader {
 	 * Process:
 	 * 1. Extract text using PDFBox for each page
 	 * 2. For each page, check if OCR is needed (using OcrDecider)
-	 * 3. If yes and tesseract available, render page to image and OCR
+	 * 3. If yes and OCR provider available, use pluggable provider (tesseract, paddle, etc.)
 	 * 4. Return PageText list with metadata (source: pdfbox/ocr)
 	 *
 	 * @param pdfFilePath the path to the PDF file
@@ -182,23 +223,22 @@ public class PDFReader {
 					}
 					
 					String finalPageText = pageText;
-					String source = "pdfbox";
 					
 					// Check if OCR is needed
 					if (OcrDecider.shouldOcr(pageText)) {
-						TesseractOcrService ocr = getOcrService(2);
-						if (ocr != null) {
+						OcrProvider provider = getOcrProvider();
+						if (provider != null) {
 							try {
 								// pageNum is 1-based, but PDFBox page index is 0-based
 								int pageIndex = pageNum - 1;
-								String ocrText = ocr.ocrPage(pdfFilePath, pageIndex);
+								OcrPage ocrPage = provider.extractPage(Paths.get(pdfFilePath), pageIndex);
 								
-								if (ocrText != null && !ocrText.trim().isEmpty()) {
-									finalPageText = ocrText;
-									source = "ocr";
+								if (ocrPage != null && !ocrPage.getText().trim().isEmpty()) {
+									finalPageText = ocrPage.getText();
+									System.out.println("    [OCR] Page " + pageNum + " processed by " + provider.getProviderName() + " (" + ocrPage.getLines().size() + " lines detected)");
 								}
 							} catch (Exception e) {
-								System.err.println("Warning: OCR failed for page " + pageNum + ": " + e.getMessage());
+								System.err.println("    [OCR] Warning: OCR failed for page " + pageNum + " (" + e.getMessage() + "), using PDFBox text");
 								// Keep pdfbox text as fallback
 							}
 						}
@@ -207,7 +247,7 @@ public class PDFReader {
 					pages.add(new PageText(pageNum, finalPageText));
 				} catch (Exception e) {
 					// If we fail to extract a page, add empty text for that page
-					System.err.println("Warning: Failed to extract text from page " + pageNum + " of " + pdfFilePath + ": " + e.getMessage());
+					System.err.println("    [PDF] Warning: Failed to extract text from page " + pageNum + " of " + pdfFilePath + ": " + e.getMessage());
 					pages.add(new PageText(pageNum, ""));
 				}
 			}

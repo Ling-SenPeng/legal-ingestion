@@ -24,8 +24,12 @@ import javax.imageio.ImageIO;
  * - Supports concurrent OCR with configurable thread pool
  * - Retries on transient failures
  * - Cleans up temporary image files
+ * - Implements OcrProvider for pluggable OCR backends
+ *
+ * Note: Tesseract does not provide bounding box information, so OcrLine
+ * objects are created with line-level splits but no bbox coordinates.
  */
-public class TesseractOcrService {
+public class TesseractOcrService implements OcrProvider {
 
 	private static final String TESSERACT_CMD = "tesseract";
 	private static final String OCR_LANGUAGE = "eng";
@@ -185,6 +189,55 @@ public class TesseractOcrService {
 		}
 
 		return output.toString().trim();
+	}
+
+	/**
+	 * OcrProvider implementation: Extract a single page with structured OCR output.
+	 *
+	 * @param pdfPath absolute path to the PDF file
+	 * @param pageIndex 0-based page index
+	 * @return OcrPage with normalized text and line-level blocks
+	 * @throws Exception if OCR fails
+	 */
+	@Override
+	public OcrPage extractPage(Path pdfPath, int pageIndex) throws Exception {
+		String text = ocrPage(pdfPath.toString(), pageIndex);
+		OcrPage page = new OcrPage(pageIndex + 1, text, getProviderName());
+
+		// Split text into lines and create OcrLine objects
+		// Note: Tesseract doesn't provide bbox coords, so we leave them null
+		if (text != null && !text.trim().isEmpty()) {
+			String[] lines = text.split("\n");
+			for (String line : lines) {
+				if (!line.trim().isEmpty()) {
+					// Tesseract doesn't provide bbox, so we create with null bbox
+					OcrLine ocrLine = new OcrLine(line, null, 0.0);  // confidence unknown for tesseract
+					page.addLine(ocrLine);
+				}
+			}
+		}
+
+		return page;
+	}
+
+	/**
+	 * OcrProvider implementation: Get provider name.
+	 *
+	 * @return "tesseract"
+	 */
+	@Override
+	public String getProviderName() {
+		return "tesseract";
+	}
+
+	/**
+	 * OcrProvider implementation: Check if provider is available.
+	 *
+	 * @return true if tesseract is available, false otherwise
+	 */
+	@Override
+	public boolean isAvailable() {
+		return isTesseractAvailable();
 	}
 
 	/**

@@ -33,9 +33,22 @@ public class PDFReader {
 	private OcrProvider ocrProvider;  // Pluggable OCR provider
 	private String configuredProviderName;  // From config.properties
 
+	/**
+	 * Constructor with default OCR provider from config.
+	 */
 	public PDFReader() {
 		this.ocrProvider = null;  // Lazy init on first OCR need
 		this.configuredProviderName = loadConfiguredOcrProvider();
+	}
+
+	/**
+	 * Constructor with explicit OCR provider name.
+	 * 
+	 * @param ocrProviderName the OCR provider to use (e.g., "paddle", "tesseract", "auto")
+	 */
+	public PDFReader(String ocrProviderName) {
+		this.ocrProvider = null;  // Lazy init on first OCR need
+		this.configuredProviderName = ocrProviderName != null ? ocrProviderName : loadConfiguredOcrProvider();
 	}
 
 	/**

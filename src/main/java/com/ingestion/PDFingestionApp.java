@@ -22,7 +22,14 @@ import java.util.Properties;
  * Usage:
  *   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFingestionApp"
  *   mvn compile exec:java -Dexec.mainClass="com.ingestion.PDFingestionApp" \
- *       -Dexec.args="/path/to/pdfs jdbc:postgresql://localhost:5432/db user pass"
+ *       -Dexec.args="/path/to/pdfs jdbc:postgresql://localhost:5432/db user pass paddle"
+ *
+ * Arguments (all optional):
+ *   1. PDF directory path (default: /Users/ling-senpeng/Documents/divorce 2026)
+ *   2. Database URL (default: jdbc:postgresql://localhost:5432/legal_ingestion)
+ *   3. Database user (default: ingestion_user)
+ *   4. Database password (default: ingestion_pass)
+ *   5. OCR provider (default: paddle) - options: paddle, tesseract, auto
  */
 public class PDFingestionApp {
 
@@ -31,6 +38,7 @@ public class PDFingestionApp {
 	private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/legal_ingestion";
 	private static final String DEFAULT_DB_USER = "ingestion_user";
 	private static final String DEFAULT_DB_PASSWORD = "ingestion_pass";
+	private static final String DEFAULT_OCR_PROVIDER = "paddle";
 
 	public static void main(String[] args) {
 		// Parse command-line arguments or load from config
@@ -38,6 +46,7 @@ public class PDFingestionApp {
 		String dbUrl = DEFAULT_DB_URL;
 		String dbUser = DEFAULT_DB_USER;
 		String dbPassword = DEFAULT_DB_PASSWORD;
+		String ocrProvider = DEFAULT_OCR_PROVIDER;
 
 		if (args.length > 0) {
 			directoryPath = args[0];
@@ -51,6 +60,9 @@ public class PDFingestionApp {
 		if (args.length > 3) {
 			dbPassword = args[3];
 		}
+		if (args.length > 4) {
+			ocrProvider = args[4];
+		}
 
 		// Try to load from config if not provided via args
 		Properties props = loadConfig();
@@ -61,6 +73,9 @@ public class PDFingestionApp {
 			dbUrl = props.getProperty("db.url", dbUrl);
 			dbUser = props.getProperty("db.user", dbUser);
 			dbPassword = props.getProperty("db.password", dbPassword);
+			if (args.length <= 4) {
+				ocrProvider = props.getProperty("ocr.provider", ocrProvider);
+			}
 		}
 
 		// Ensure database driver is loaded
@@ -69,9 +84,10 @@ public class PDFingestionApp {
 		System.out.println("=== PDF ingestion Pipeline (MVP Level 1) ===");
 		System.out.println("Input Directory: " + directoryPath);
 		System.out.println("Database URL: " + dbUrl);
+		System.out.println("OCR Provider: " + ocrProvider);
 		System.out.println();
 
-		PDFReader pdfReader = new PDFReader();
+		PDFReader pdfReader = new PDFReader(ocrProvider);
 
 		try {
 			// Discover all PDF files

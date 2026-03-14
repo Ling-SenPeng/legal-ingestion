@@ -18,6 +18,35 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - legal-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: legal-ingestion-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: legal_ingestion
+      DB_USER: ingestion_user
+      DB_PASSWORD: ingestion_pass
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    ports:
+      - "8080:8080"
+    networks:
+      - legal-network
+    # Override default command - uncomment to run specific class
+    # command: java -cp /app/classes:/app/dependency/* com.ingestion.PaymentExtractionExample 123
 
 volumes:
   postgres_data:
+
+networks:
+  legal-network:
+    driver: bridge

@@ -104,7 +104,7 @@ public class OpenAIEmbeddingClient {
 	 * @throws Exception if the API key is not set
 	 */
 	public static String getApiKeyFromEnv() throws Exception {
-		String apiKey = EnvLoader.get("OPENAI_API_KEY");
+		String apiKey = System.getProperty("OPENAI_API_KEY");
 		if (apiKey == null || apiKey.trim().isEmpty()) {
 			throw new Exception("OPENAI_API_KEY not found. Please set it in .env file or OPENAI_API_KEY environment variable.");
 		}

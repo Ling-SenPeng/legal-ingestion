@@ -1,8 +1,10 @@
 package com.ingestion;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import java.io.InputStream;
 import java.sql.DriverManager;
 import java.util.Properties;
+import com.ingestion.service.payment.PaymentExtractionPipeline;
 
 /**
  * Main application entry point supporting multiple subcommands.
@@ -13,8 +15,15 @@ public class AppMain {
 	private static final String CONFIG_FILE = "config.properties";
 
 	public static void main(String[] args) {
-		// Load environment variables from .env file (if present)
-		EnvLoader.load();
+		// Load environment variables from .env file
+		Dotenv dotenv = Dotenv.configure()
+			.ignoreIfMissing()
+			.load();
+		
+		// Populate system properties from .env
+		dotenv.entries().forEach(entry -> 
+			System.setProperty(entry.getKey(), entry.getValue())
+		);
 
 		if (args.length == 0) {
 			printUsage();
@@ -39,6 +48,10 @@ public class AppMain {
 
 				case "hybrid-search":
 					runHybridSearch(args);
+					break;
+
+				case "extract-payments":
+					runExtractPayments(args);
 					break;
 
 				default:
@@ -201,6 +214,73 @@ public class AppMain {
 		return properties;
 	}
 
+	private static void runExtractPayments(String[] args) throws Exception {
+		System.out.println("=== Payment Extraction Command ===");
+
+		// Parse arguments: extract-payments <pdf_document_id> [--model model_name]
+		if (args.length < 2) {
+			System.err.println("Error: PDF document ID is required");
+			System.err.println("Usage: java AppMain extract-payments <pdf_id> [--model gpt-4o-mini]");
+			System.exit(1);
+		}
+
+		long pdfDocumentId;
+		try {
+			pdfDocumentId = Long.parseLong(args[1]);
+		} catch (NumberFormatException e) {
+			System.err.println("Error: PDF document ID must be a valid number");
+			System.exit(1);
+			return;
+		}
+
+		String modelOverride = null;
+		for (int i = 2; i < args.length; i++) {
+			if (args[i].equals("--model") && i + 1 < args.length) {
+				modelOverride = args[i + 1];
+				i++;
+			}
+		}
+
+		// Load config
+		Properties props = loadConfig();
+		String dbUrl = props.getProperty("db.url", "jdbc:postgresql://localhost:5432/legal_ingestion");
+		String dbUser = props.getProperty("db.user", "ingestion_user");
+		String dbPassword = props.getProperty("db.password", "ingestion_pass");
+
+		// Create database connection
+		try (java.sql.Connection dbConn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
+			// Create pipeline with OpenAI configuration
+			PaymentExtractionPipeline pipeline;
+			if (modelOverride != null) {
+				pipeline = PaymentExtractionPipeline.withOpenAi(dbConn, modelOverride);
+				System.out.println("Using model override: " + modelOverride);
+			} else {
+				pipeline = PaymentExtractionPipeline.withDefaultOpenAi(dbConn);
+			}
+
+			// Process the PDF
+			System.out.println("Processing PDF document ID: " + pdfDocumentId);
+			PaymentExtractionPipeline.PaymentExtractionPipelineResult result = pipeline.processPdfDocument(pdfDocumentId);
+
+			// Display results
+			if (result.isSuccess()) {
+				System.out.println();
+				System.out.println("✓ Extraction completed successfully");
+				System.out.println("  Statements: " + (result.getExtractionRun() != null ? result.getExtractionRun().getStatementCount() : 0));
+				System.out.println("  Payments: " + result.getPaymentCount());
+				System.out.println("  Inserted: " + result.getInsertedCount());
+				if (result.getExtractionRun() != null && result.getExtractionRun().getIsScanned()) {
+					System.out.println("  Note: Scanned (OCR) document detected");
+				}
+			} else {
+				System.out.println();
+				System.out.println("✗ Extraction failed");
+				System.out.println("  Error: " + result.getErrorMessage());
+				System.exit(1);
+			}
+		}
+	}
+
 	private static void printUsage() {
 		System.out.println("=== Legal ingestion Tool ===");
 		System.out.println();
@@ -209,6 +289,7 @@ public class AppMain {
 		System.out.println("  mvn exec:java -Dexec.args=\"embed-missing [--limit 100] [--batchSize 50]\"");
 		System.out.println("  mvn exec:java -Dexec.args=\"search --query \\\"your search\\\" [--topK 10]\"");
 		System.out.println("  mvn exec:java -Dexec.args=\"hybrid-search --query \\\"your search\\\" [--topK 10] [--vectorTopN 20] [--keywordTopN 20] [--alpha 0.7]\"");
+		System.out.println("  java AppMain extract-payments <pdf_id> [--model gpt-4o-mini]");
 		System.out.println();
 		System.out.println("Hybrid Search:");
 		System.out.println("  Combines vector similarity and keyword (full-text) search for legal documents.");
@@ -218,9 +299,14 @@ public class AppMain {
 		System.out.println("  --keywordTopN   : Number of keyword search results to fetch (default: 20)");
 		System.out.println("  --alpha         : Weight for vector score in [0,1] (default: 0.7)");
 		System.out.println("                    finalScore = alpha*vectorScore + (1-alpha)*keywordScore");
+		System.out.println("Payment Extraction:");
+		System.out.println("  Extracts payment records from PDF bank statements using OpenAI API.");
+		System.out.println("  <pdf_id>      : Document ID from pdf_documents table (required)");
+		System.out.println("  --model       : Override OpenAI model (default: gpt-4o-mini)");
 		System.out.println();
 		System.out.println("Environment Variables:");
-		System.out.println("  OPENAI_API_KEY - Required for embed-missing, search, and hybrid-search commands");
+		System.out.println("  OPENAI_API_KEY - Required for embed-missing, search, hybrid-search, and extract-payments commands");
+		System.out.println("  OPENAI_MODEL   - OpenAI model for extract-payments (default: gpt-4o-mini)");
 		System.out.println();
 		System.out.println("Configuration:");
 		System.out.println("  See config.properties for database and application settings");

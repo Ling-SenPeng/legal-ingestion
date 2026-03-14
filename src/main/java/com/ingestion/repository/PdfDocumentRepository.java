@@ -81,7 +81,8 @@ public class PdfDocumentRepository {
      */
     public static void update(Connection conn, PdfDocument doc) throws Exception {
         String sql = 
-            "UPDATE pdf_documents SET file_name = ?, file_path = ?, status = ?, error_msg = ?, processed_at = ? " +
+            "UPDATE pdf_documents SET file_name = ?, file_path = ?, status = ?, error_msg = ?, processed_at = ?, " +
+            "payment_extraction_status = ?, payment_extraction_error_msg = ?, payment_extraction_completed_at = ? " +
             "WHERE id = ?";
         
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -90,7 +91,10 @@ public class PdfDocumentRepository {
             stmt.setString(3, doc.getStatus());
             stmt.setString(4, doc.getErrorMsg());
             stmt.setObject(5, doc.getProcessedAt());
-            stmt.setLong(6, doc.getId());
+            stmt.setString(6, doc.getPaymentExtractionStatus());
+            stmt.setString(7, doc.getPaymentExtractionErrorMsg());
+            stmt.setObject(8, doc.getPaymentExtractionCompletedAt());
+            stmt.setLong(9, doc.getId());
             stmt.executeUpdate();
         }
     }
@@ -143,6 +147,10 @@ public class PdfDocumentRepository {
         doc.setStatus(rs.getString("status"));
         doc.setErrorMsg(rs.getString("error_msg"));
         
+        // Payment extraction status fields
+        doc.setPaymentExtractionStatus(rs.getString("payment_extraction_status"));
+        doc.setPaymentExtractionErrorMsg(rs.getString("payment_extraction_error_msg"));
+        
         java.sql.Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) {
             doc.setCreatedAt(createdAt.toInstant());
@@ -151,6 +159,11 @@ public class PdfDocumentRepository {
         java.sql.Timestamp processedAt = rs.getTimestamp("processed_at");
         if (processedAt != null) {
             doc.setProcessedAt(processedAt.toInstant());
+        }
+        
+        java.sql.Timestamp paymentExtractionCompletedAt = rs.getTimestamp("payment_extraction_completed_at");
+        if (paymentExtractionCompletedAt != null) {
+            doc.setPaymentExtractionCompletedAt(paymentExtractionCompletedAt.toInstant());
         }
         
         return doc;

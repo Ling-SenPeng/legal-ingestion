@@ -280,17 +280,27 @@ public class AppMain {
 				}
 				pdfsToProcess.add(pdfDoc);
 			} else if (processAll) {
-				// Process all PDFs (or filter by status)
+				// Process all PDFs (or filter by payment extraction status)
 				if (statusFilter != null) {
-					pdfsToProcess = PdfDocumentRepository.findByStatus(dbConn, statusFilter);
-					System.out.println("Processing all PDFs with status: " + statusFilter);
+					// Custom query needed for payment_extraction_status filter
+					// For now, fetch all and filter in memory (or add method to repository)
+					java.util.List<PdfDocument> allDocs = PdfDocumentRepository.findAll(dbConn);
+					for (PdfDocument doc : allDocs) {
+						if (statusFilter.equals(doc.getPaymentExtractionStatus())) {
+							pdfsToProcess.add(doc);
+						}
+					}
+					System.out.println("Processing all PDFs with payment extraction status: " + statusFilter);
 				} else {
-					// Process only unprocessed PDFs (status: NEW or FAILED)
-					java.util.List<PdfDocument> newDocs = PdfDocumentRepository.findByStatus(dbConn, "NEW");
-					java.util.List<PdfDocument> failedDocs = PdfDocumentRepository.findByStatus(dbConn, "FAILED");
-					pdfsToProcess.addAll(newDocs);
-					pdfsToProcess.addAll(failedDocs);
-					System.out.println("Processing all unprocessed PDFs (status: NEW or FAILED)");
+					// Process only unprocessed PDFs (payment_extraction_status: NEW or FAILED)
+					java.util.List<PdfDocument> allDocs = PdfDocumentRepository.findAll(dbConn);
+					for (PdfDocument doc : allDocs) {
+						String peStatus = doc.getPaymentExtractionStatus();
+						if (peStatus == null || peStatus.equals("NEW") || peStatus.equals("FAILED")) {
+							pdfsToProcess.add(doc);
+						}
+					}
+					System.out.println("Processing all unprocessed PDFs (payment extraction status: NEW or FAILED)");
 				}
 			} else {
 				// No PDF ID and no --all flag: print usage and exit
@@ -340,19 +350,20 @@ public class AppMain {
 							System.out.println("    Note: Scanned (OCR) document detected");
 						}
 
-						// Update PDF document status to COMPLETED
-						pdfDoc.setStatus("COMPLETED");
-						pdfDoc.setProcessedAt(java.time.Instant.now());
+						// Update PDF document payment extraction status to SUCCEEDED
+						pdfDoc.setPaymentExtractionStatus("SUCCEEDED");
+						pdfDoc.setPaymentExtractionCompletedAt(java.time.Instant.now());
+						pdfDoc.setPaymentExtractionErrorMsg(null);
 						PdfDocumentRepository.update(dbConn, pdfDoc);
 						
 						successCount++;
 					} else {
 						System.out.println("  ✗ Failed: " + result.getErrorMessage());
 
-						// Update PDF document status to FAILED
-						pdfDoc.setStatus("FAILED");
-						pdfDoc.setErrorMsg(result.getErrorMessage());
-						pdfDoc.setProcessedAt(java.time.Instant.now());
+						// Update PDF document payment extraction status to FAILED
+						pdfDoc.setPaymentExtractionStatus("FAILED");
+						pdfDoc.setPaymentExtractionErrorMsg(result.getErrorMessage());
+						pdfDoc.setPaymentExtractionCompletedAt(java.time.Instant.now());
 						PdfDocumentRepository.update(dbConn, pdfDoc);
 						
 						failureCount++;
@@ -360,14 +371,14 @@ public class AppMain {
 				} catch (Exception e) {
 					System.out.println("  ✗ Exception: " + e.getMessage());
 
-					// Update PDF document status to FAILED
-					pdfDoc.setStatus("FAILED");
-					pdfDoc.setErrorMsg(e.getMessage());
-					pdfDoc.setProcessedAt(java.time.Instant.now());
+					// Update PDF document payment extraction status to FAILED
+					pdfDoc.setPaymentExtractionStatus("FAILED");
+					pdfDoc.setPaymentExtractionErrorMsg(e.getMessage());
+					pdfDoc.setPaymentExtractionCompletedAt(java.time.Instant.now());
 					try {
 						PdfDocumentRepository.update(dbConn, pdfDoc);
 					} catch (Exception updateEx) {
-						System.err.println("    Warning: Failed to update PDF status in database: " + updateEx.getMessage());
+						System.err.println("    Warning: Failed to update PDF payment extraction status in database: " + updateEx.getMessage());
 					}
 					
 					failureCount++;
@@ -410,15 +421,21 @@ public class AppMain {
 		System.out.println("Payment Extraction:");
 		System.out.println("  Extracts payment records from PDF bank statements using OpenAI API.");
 		System.out.println("  <pdf_id>      : Document ID from pdf_documents table (optional)");
-		System.out.println("  --all         : Process all unprocessed PDFs (status: NEW or FAILED)");
-		System.out.println("  --status      : Filter by status when using --all (e.g., NEW, FAILED, COMPLETED)");
+		System.out.println("  --all         : Process all unprocessed PDFs (payment extraction status: NEW or FAILED)");
+		System.out.println("  --status      : Filter by payment extraction status when using --all (e.g., NEW, FAILED, SUCCEEDED)");
 		System.out.println("  --model       : Override OpenAI model (default: gpt-4o-mini)");
 		System.out.println();
 		System.out.println("PDF Status Values:");
-		System.out.println("  NEW           : Not yet processed");
-		System.out.println("  PROCESSING    : Currently processing (for ingest command)");
-		System.out.println("  COMPLETED     : Successfully processed");
-		System.out.println("  FAILED        : Processing failed");
+		System.out.println("  Ingestion Status (status column):");
+		System.out.println("    NEW           : Not yet ingested");
+		System.out.println("    PROCESSING    : Currently ingesting");
+		System.out.println("    DONE          : Successfully ingested");
+		System.out.println("    FAILED        : Ingestion failed");
+		System.out.println("  Payment Extraction Status (payment_extraction_status column):");
+		System.out.println("    NEW           : Not yet extracted");
+		System.out.println("    RUNNING       : Currently extracting");
+		System.out.println("    SUCCEEDED     : Successfully extracted");
+		System.out.println("    FAILED        : Extraction failed");
 		System.out.println();
 		System.out.println("Environment Variables:");
 		System.out.println("  OPENAI_API_KEY - Required for embed-missing, search, hybrid-search, and extract-payments commands");

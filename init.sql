@@ -15,11 +15,15 @@ CREATE TABLE IF NOT EXISTS pdf_documents (
   sha256 CHAR(64) UNIQUE,                 -- File content hash for deduplication
   file_size BIGINT NOT NULL,
 
-  status VARCHAR(20) NOT NULL DEFAULT 'NEW',  -- NEW | PROCESSING | DONE | FAILED
+  status VARCHAR(20) NOT NULL DEFAULT 'NEW',  -- Ingestion status: NEW | PROCESSING | DONE | FAILED
   error_msg TEXT,
 
+  payment_extraction_status VARCHAR(20) DEFAULT 'NEW',  -- Payment extraction status: NEW | RUNNING | SUCCEEDED | FAILED
+  payment_extraction_error_msg TEXT,
+
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  processed_at TIMESTAMP
+  processed_at TIMESTAMP,
+  payment_extraction_completed_at TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_pdf_documents_status ON pdf_documents(status);

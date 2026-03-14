@@ -12,10 +12,18 @@ public class PdfDocument {
     private String filePath;
     private String sha256;
     private Long fileSize;
-    private String status;  // NEW, PROCESSING, COMPLETED, FAILED, etc.
+    
+    // Ingestion status (for PDF ingestion/chunking)
+    private String status;  // NEW, PROCESSING, DONE, FAILED
     private String errorMsg;
+    
+    // Payment extraction status (for payment extraction pipeline)
+    private String paymentExtractionStatus;  // NEW, RUNNING, SUCCEEDED, FAILED
+    private String paymentExtractionErrorMsg;
+    
     private Instant createdAt;
     private Instant processedAt;
+    private Instant paymentExtractionCompletedAt;
 
     // Constructors
     public PdfDocument() {}
@@ -102,7 +110,29 @@ public class PdfDocument {
         this.processedAt = processedAt;
     }
 
-    @Override
+    public String getPaymentExtractionStatus() {
+        return paymentExtractionStatus;
+    }
+
+    public void setPaymentExtractionStatus(String paymentExtractionStatus) {
+        this.paymentExtractionStatus = paymentExtractionStatus;
+    }
+
+    public String getPaymentExtractionErrorMsg() {
+        return paymentExtractionErrorMsg;
+    }
+
+    public void setPaymentExtractionErrorMsg(String paymentExtractionErrorMsg) {
+        this.paymentExtractionErrorMsg = paymentExtractionErrorMsg;
+    }
+
+    public Instant getPaymentExtractionCompletedAt() {
+        return paymentExtractionCompletedAt;
+    }
+
+    public void setPaymentExtractionCompletedAt(Instant paymentExtractionCompletedAt) {
+        this.paymentExtractionCompletedAt = paymentExtractionCompletedAt;
+    }
     public String toString() {
         return "PdfDocument{" +
                 "id=" + id +

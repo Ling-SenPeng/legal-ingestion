@@ -173,6 +173,137 @@ public class OpenAiLlmClient implements LlmClient {
     }
 
     /**
+     * Complete a request with vision (image) content.
+     * Used for analyzing images and PDFs with vision-capable models.
+     *
+     * @param textPrompt the text prompt/instruction
+     * @param imageBase64List list of base64-encoded images
+     * @param modelOverride the model to use (must support vision, e.g., gpt-4o)
+     * @return the response from the LLM
+     * @throws Exception if the request fails
+     */
+    public String completeWithImages(String textPrompt, java.util.List<String> imageBase64List, String modelOverride) throws Exception {
+        if (textPrompt == null || textPrompt.isEmpty()) {
+            throw new Exception("Text prompt cannot be null or empty");
+        }
+
+        if (imageBase64List == null || imageBase64List.isEmpty()) {
+            throw new Exception("Image list cannot be null or empty");
+        }
+
+        String modelToUse = modelOverride != null && !modelOverride.isEmpty() ? modelOverride : this.model;
+
+        // Check if model supports vision
+        if (!modelToUse.contains("gpt-4") && !modelToUse.contains("vision")) {
+            System.err.println("  [Vision] Warning: Model " + modelToUse + " may not support vision. Falling back to text extraction.");
+        }
+
+        // Build request payload
+        ObjectNode requestBody = objectMapper.createObjectNode();
+        requestBody.put("model", modelToUse);
+        requestBody.put("max_tokens", MAX_TOKENS);
+        requestBody.put("temperature", 0);  // Deterministic for extraction
+        
+        // Messages array
+        ArrayNode messagesArray = requestBody.putArray("messages");
+        
+        // System message
+        ObjectNode systemMessage = objectMapper.createObjectNode();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", 
+            "You are a financial document analysis expert. Analyze the provided document images " +
+            "and extract payment information. Return ONLY valid JSON, no markdown, no code blocks, " +
+            "no additional text. Return exactly the JSON structure requested."
+        );
+        messagesArray.add(systemMessage);
+        
+        // User message with text and images
+        ObjectNode userMessage = objectMapper.createObjectNode();
+        userMessage.put("role", "user");
+        
+        ArrayNode contentArray = userMessage.putArray("content");
+        
+        // Add text content
+        ObjectNode textContent = objectMapper.createObjectNode();
+        textContent.put("type", "text");
+        textContent.put("text", textPrompt);
+        contentArray.add(textContent);
+        
+        // Add image content
+        for (String base64Image : imageBase64List) {
+            ObjectNode imageContent = objectMapper.createObjectNode();
+            imageContent.put("type", "image_url");
+            
+            ObjectNode imageUrl = objectMapper.createObjectNode();
+            imageUrl.put("url", "data:image/jpeg;base64," + base64Image);
+            imageUrl.put("detail", "high");  // high detail for financial documents
+            
+            imageContent.set("image_url", imageUrl);
+            contentArray.add(imageContent);
+        }
+        
+        messagesArray.add(userMessage);
+        
+        String payload = objectMapper.writeValueAsString(requestBody);
+
+        // Create HTTP request
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(new URI(OPENAI_API_URL))
+            .header("Authorization", "Bearer " + apiKey)
+            .header("Content-Type", "application/json")
+            .timeout(Duration.ofSeconds(TIMEOUT_SECONDS))
+            .POST(HttpRequest.BodyPublishers.ofString(payload))
+            .build();
+
+        // Execute request
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            throw new Exception("Failed to connect to OpenAI API: " + e.getMessage(), e);
+        }
+
+        if (response.statusCode() != 200) {
+            String errorBody = response.body();
+            String message = "OpenAI API error: " + response.statusCode();
+            
+            // Try to extract error message from response
+            try {
+                JsonNode errorNode = objectMapper.readTree(errorBody);
+                if (errorNode.has("error") && errorNode.get("error").has("message")) {
+                    String apiErrorMsg = errorNode.get("error").get("message").asText();
+                    message += " - " + apiErrorMsg;
+                }
+            } catch (Exception e) {
+                message += " - " + errorBody;
+            }
+            
+            throw new Exception(message);
+        }
+
+        // Parse response
+        JsonNode responseNode = objectMapper.readTree(response.body());
+        
+        if (!responseNode.has("choices") || responseNode.get("choices").size() == 0) {
+            throw new Exception("Unexpected response format from OpenAI API: no choices in response");
+        }
+
+        JsonNode firstChoice = responseNode.get("choices").get(0);
+        if (!firstChoice.has("message") || !firstChoice.get("message").has("content")) {
+            throw new Exception("Unexpected response format from OpenAI API: no message content");
+        }
+
+        String responseText = firstChoice.get("message").get("content").asText();
+        
+        if (responseText == null || responseText.isEmpty()) {
+            throw new Exception("Empty response from OpenAI API");
+        }
+
+        return responseText;
+    }
+
+    /**
      * Get the model name being used.
      */
     public String getModelName() {

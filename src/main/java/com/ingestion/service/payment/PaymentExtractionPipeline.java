@@ -129,15 +129,30 @@ public class PaymentExtractionPipeline {
 
             // Step 4: Load full document text from PDF
             String documentText = PdfTextLoader.loadTextFromPdf(pdfDoc.getFilePath());
-            if (documentText == null || documentText.isEmpty()) {
-                throw new Exception("Failed to load text from PDF: " + pdfDoc.getFilePath());
-            }
             
-            extractionRun.setInputTextLength(documentText.length());
-            result.setDocumentTextLength(documentText.length());
+            // Step 4.5: If no text, try vision-based extraction for scanned PDFs
+            PaymentExtractionResult extractionResult = null;
+            
+            if (documentText == null || documentText.isEmpty()) {
+                System.out.println("  [Vision] Detected scanned/image-based PDF. Using vision-based extraction (GPT-4o)...");
+                try {
+                    // Use vision-based extraction for scanned PDFs
+                    extractionResult = extractionService.extractPaymentsFromScannedPdf(pdfDoc.getFilePath());
+                    extractionRun.setInputTextLength(0);  // Vision-based, no text input
+                } catch (Exception visionException) {
+                    throw new Exception(
+                        "PDF is scanned and vision-based extraction failed: " + visionException.getMessage()
+                    );
+                }
+            } else {
+                // Use text-based extraction for digital PDFs
+                extractionRun.setInputTextLength(documentText.length());
+                result.setDocumentTextLength(documentText.length());
+                
+                // Step 5 & 6 & 7: Call LLM with text
+                extractionResult = extractionService.extractPayments(documentText);
+            }
 
-            // Step 5 & 6 & 7: Call LLM, parse JSON, and flatten to payment records
-            PaymentExtractionResult extractionResult = extractionService.extractPayments(documentText);
             if (extractionResult == null) {
                 throw new Exception("Extraction returned null result");
             }

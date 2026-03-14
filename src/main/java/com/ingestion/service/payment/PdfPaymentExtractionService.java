@@ -7,6 +7,7 @@ import com.ingestion.entity.ExtractedPayment;
 import com.ingestion.entity.PaymentExtractionResult;
 import com.ingestion.entity.StatementSummary;
 import com.ingestion.service.llm.LlmClient;
+import com.ingestion.service.llm.OpenAiLlmClient;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -67,6 +68,150 @@ public class PdfPaymentExtractionService {
      */
     public PaymentExtractionResult extractPayments(String documentText) throws Exception {
         return extractPayments(documentText, null);  // Let LLM client use default
+    }
+
+    /**
+     * Extract payments from PDF images using vision AI.
+     * For scanned documents that cannot be text-extracted.
+     * Requires OpenAI client with vision support (GPT-4o or similar).
+     *
+     * @param filePath path to the PDF file
+     * @param modelName the vision-capable model to use (e.g., "gpt-4o")
+     * @param maxPages maximum number of pages to process
+     * @return PaymentExtractionResult with statements and payments
+     * @throws Exception if image extraction or LLM call fails
+     */
+    public PaymentExtractionResult extractPaymentsFromScannedPdf(
+            String filePath, 
+            String modelName,
+            int maxPages) throws Exception {
+        
+        if (filePath == null || filePath.isEmpty()) {
+            throw new IllegalArgumentException("File path cannot be empty");
+        }
+
+        // Check if LLM client is OpenAI with vision support
+        if (!(llmClient instanceof OpenAiLlmClient)) {
+            throw new Exception("Vision-based extraction requires OpenAI client");
+        }
+
+        OpenAiLlmClient openAiClient = (OpenAiLlmClient) llmClient;
+
+        // Extract images from PDF
+        System.out.println("  [Vision] Extracting images from scanned PDF...");
+        List<String> base64Images = PdfImageExtractor.extractPageImagesAsBase64(filePath, maxPages);
+        
+        if (base64Images.isEmpty()) {
+            throw new Exception("Failed to extract images from PDF");
+        }
+
+        // Build vision prompt
+        String prompt = buildVisionExtractionPrompt(base64Images.size());
+
+        // Call LLM with images
+        System.out.println("  [Vision] Calling LLM with " + base64Images.size() + " images...");
+        String llmResponse = openAiClient.completeWithImages(prompt, base64Images, modelName);
+
+        // Parse response
+        PaymentExtractionResult result = parseJsonResponse(llmResponse);
+
+        // Validate and filter
+        validateAndCleanResult(result);
+
+        // Mark as processed via vision
+        if (result.getDocumentSummary() != null) {
+            result.getDocumentSummary().setIsScannedDocument(true);
+        }
+
+        return result;
+    }
+
+    /**
+     * Extract payments from scanned PDF using default vision model (GPT-4o).
+     *
+     * @param filePath path to the PDF file
+     * @return PaymentExtractionResult
+     * @throws Exception if extraction fails
+     */
+    public PaymentExtractionResult extractPaymentsFromScannedPdf(String filePath) throws Exception {
+        return extractPaymentsFromScannedPdf(filePath, "gpt-4o", 20);
+    }
+
+    /**
+     * Build prompt for vision-based extraction from PDF images.
+     *
+     * @param pageCount number of pages being analyzed
+     * @return the prompt for the LLM
+     */
+    private String buildVisionExtractionPrompt(int pageCount) {
+        StringBuilder prompt = new StringBuilder();
+        
+        prompt.append("You are a financial document analysis expert. Analyze the provided PDF page images and extract payment information.\n\n");
+        
+        prompt.append("CRITICAL OUTPUT FORMAT:\n");
+        prompt.append("1. Return ONLY a single JSON object. Nothing else.\n");
+        prompt.append("2. NO markdown code blocks (no ```json or ```)\n");
+        prompt.append("3. NO additional text before or after the JSON\n");
+        prompt.append("4. NO explanation or commentary\n\n");
+        
+        prompt.append("EXTRACTION RULES:\n");
+        prompt.append("1. Extract all payment records from the ").append(pageCount).append(" page(s) provided\n");
+        prompt.append("2. For each payment, extract:\n");
+        prompt.append("   - payment_date (YYYY-MM-DD format)\n");
+        prompt.append("   - category (PRINCIPAL, INTEREST, ESCROW, TAX, INSURANCE, OTHER)\n");
+        prompt.append("   - total_amount (numeric, >= 0, with 2 decimals)\n");
+        prompt.append("   - Amount breakdown: principal, interest, escrow, tax, insurance (all optional)\n");
+        prompt.append("   - payer/payee names\n");
+        prompt.append("   - property address/city/state/zip if visible\n");
+        prompt.append("   - source_page (page number where found)\n");
+        prompt.append("3. Group payments by statement period if multiple statements exist\n");
+        prompt.append("4. Include confidence scores (0.0-1.0) for each extraction\n");
+        prompt.append("5. Mark unclear amounts with lower confidence\n");
+        prompt.append("6. Do NOT fabricate data - only extract what is visible\n\n");
+        
+        prompt.append("RESPONSE SCHEMA:\n");
+        prompt.append("{\n");
+        prompt.append("  \"document_summary\": {\n");
+        prompt.append("    \"bank_name\": \"string or null\",\n");
+        prompt.append("    \"statement_count\": integer,\n");
+        prompt.append("    \"is_scanned_document\": true\n");
+        prompt.append("  },\n");
+        prompt.append("  \"statements\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"statement_index\": 1,\n");
+        prompt.append("      \"statement_period_start\": \"YYYY-MM-DD\",\n");
+        prompt.append("      \"statement_period_end\": \"YYYY-MM-DD\",\n");
+        prompt.append("      \"payments\": [\n");
+        prompt.append("        {\n");
+        prompt.append("          \"payment_date\": \"YYYY-MM-DD\",\n");
+        prompt.append("          \"category\": \"string (required)\",\n");
+        prompt.append("          \"total_amount\": number (required),\n");
+        prompt.append("          \"principal_amount\": number or null,\n");
+        prompt.append("          \"interest_amount\": number or null,\n");
+        prompt.append("          \"escrow_amount\": number or null,\n");
+        prompt.append("          \"tax_amount\": number or null,\n");
+        prompt.append("          \"insurance_amount\": number or null,\n");
+        prompt.append("          \"payer_name\": \"string or null\",\n");
+        prompt.append("          \"payee_name\": \"string or null\",\n");
+        prompt.append("          \"property_address\": \"string or null\",\n");
+        prompt.append("          \"property_city\": \"string or null\",\n");
+        prompt.append("          \"property_state\": \"string or null\",\n");
+        prompt.append("          \"property_zip\": \"string or null\",\n");
+        prompt.append("          \"description\": \"string or null\",\n");
+        prompt.append("          \"source_page\": integer or null,\n");
+        prompt.append("          \"source_snippet\": \"string or null\",\n");
+        prompt.append("          \"confidence\": number (0.0 to 1.0)\n");
+        prompt.append("        }\n");
+        prompt.append("      ]\n");
+        prompt.append("    }\n");
+        prompt.append("  ]\n");
+        prompt.append("}\n\n");
+        
+        prompt.append("If no payments found, return: {\"statements\": [], \"document_summary\": {\"statement_count\": 0, \"is_scanned_document\": true}}\n\n");
+        
+        prompt.append("Return ONLY the JSON object, nothing else.\n");
+
+        return prompt.toString();
     }
 
     /**

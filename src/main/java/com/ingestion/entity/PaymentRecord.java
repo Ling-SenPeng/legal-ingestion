@@ -39,6 +39,9 @@ public class PaymentRecord {
     private String payerName;
     private String payeeName;
     
+    // Loan information
+    private String loanNumber;
+    
     // Property information
     private String propertyAddress;
     private String propertyCity;
@@ -189,6 +192,14 @@ public class PaymentRecord {
 
     public void setPayeeName(String payeeName) {
         this.payeeName = payeeName;
+    }
+
+    public String getLoanNumber() {
+        return loanNumber;
+    }
+
+    public void setLoanNumber(String loanNumber) {
+        this.loanNumber = loanNumber;
     }
 
     public String getPropertyAddress() {

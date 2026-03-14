@@ -162,6 +162,7 @@ public class PdfPaymentExtractionService {
         prompt.append("   - total_amount (numeric, >= 0, with 2 decimals)\n");
         prompt.append("   - Amount breakdown: principal, interest, escrow, tax, insurance (all optional)\n");
         prompt.append("   - payer/payee names\n");
+        prompt.append("   - loan_number if visible\n");
         prompt.append("   - property address/city/state/zip if visible\n");
         prompt.append("   - source_page (page number where found)\n");
         prompt.append("3. Group payments by statement period if multiple statements exist\n");
@@ -193,6 +194,7 @@ public class PdfPaymentExtractionService {
         prompt.append("          \"insurance_amount\": number or null,\n");
         prompt.append("          \"payer_name\": \"string or null\",\n");
         prompt.append("          \"payee_name\": \"string or null\",\n");
+        prompt.append("          \"loan_number\": \"string or null\",\n");
         prompt.append("          \"property_address\": \"string or null\",\n");
         prompt.append("          \"property_city\": \"string or null\",\n");
         prompt.append("          \"property_state\": \"string or null\",\n");

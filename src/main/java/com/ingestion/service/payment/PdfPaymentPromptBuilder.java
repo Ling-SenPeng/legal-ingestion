@@ -48,6 +48,7 @@ IMPORTANT CONSTRAINTS:
 8. Confidence should be a decimal between 0.0 and 1.0, indicating your confidence in the extraction (0.95 = very confident, 0.60 = somewhat confident).
 9. If the document appears to be scanned/OCR'd (degraded text, manual annotations), set is_scanned_document to true.
 10. Include source_page if you can determine which page the payment appears on.
+11. Extract loan_number if visible on the statement.
 
 RESPONSE SCHEMA (JSON):
 {
@@ -73,6 +74,7 @@ RESPONSE SCHEMA (JSON):
           "insurance_amount": number or null,
           "payer_name": "string or null",
           "payee_name": "string or null",
+          "loan_number": "string or null",
           "property_address": "string or null",
           "property_city": "string or null",
           "property_state": "string or null",
@@ -109,6 +111,7 @@ EXAMPLE RESPONSE for a simple single-statement PDF:
           "escrow_amount": 200.00,
           "payer_name": "John Doe",
           "payee_name": "Mortgage Servicer Inc",
+          "loan_number": "123456789",
           "property_address": "123 Main Street",
           "property_city": "Springfield",
           "property_state": "IL",

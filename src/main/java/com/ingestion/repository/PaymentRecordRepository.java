@@ -27,9 +27,9 @@ public class PaymentRecordRepository {
             "(pdf_document_id, statement_index, statement_period_start, statement_period_end, " +
             "payment_date, category, total_amount, principal_amount, interest_amount, " +
             "escrow_amount, tax_amount, insurance_amount, currency, payer_name, payee_name, " +
-            "property_address, property_city, property_state, property_zip, description, " +
+            "loan_number, property_address, property_city, property_state, property_zip, description, " +
             "source_page, source_snippet, confidence, raw_llm_json, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?::jsonb, ?) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?) " +
             "RETURNING id";
         
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -48,19 +48,20 @@ public class PaymentRecordRepository {
             stmt.setString(13, record.getCurrency() != null ? record.getCurrency() : "USD");
             stmt.setString(14, record.getPayerName());
             stmt.setString(15, record.getPayeeName());
-            stmt.setString(16, record.getPropertyAddress());
-            stmt.setString(17, record.getPropertyCity());
-            stmt.setString(18, record.getPropertyState());
-            stmt.setString(19, record.getPropertyZip());
-            stmt.setString(20, record.getDescription());
-            stmt.setObject(21, record.getSourcePage());
-            stmt.setString(22, record.getSourceSnippet());
-            stmt.setBigDecimal(23, record.getConfidence());
+            stmt.setString(16, record.getLoanNumber());
+            stmt.setString(17, record.getPropertyAddress());
+            stmt.setString(18, record.getPropertyCity());
+            stmt.setString(19, record.getPropertyState());
+            stmt.setString(20, record.getPropertyZip());
+            stmt.setString(21, record.getDescription());
+            stmt.setObject(22, record.getSourcePage());
+            stmt.setString(23, record.getSourceSnippet());
+            stmt.setBigDecimal(24, record.getConfidence());
             
             String jsonString = record.getRawLlmJson() != null ? record.getRawLlmJson().toString() : null;
-            stmt.setString(24, jsonString);
+            stmt.setString(25, jsonString);
             
-            stmt.setObject(25, record.getCreatedAt() != null ? record.getCreatedAt() : Instant.now());
+            stmt.setObject(26, record.getCreatedAt() != null ? record.getCreatedAt() : Instant.now());
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -80,9 +81,9 @@ public class PaymentRecordRepository {
             "(pdf_document_id, statement_index, statement_period_start, statement_period_end, " +
             "payment_date, category, total_amount, principal_amount, interest_amount, " +
             "escrow_amount, tax_amount, insurance_amount, currency, payer_name, payee_name, " +
-            "property_address, property_city, property_state, property_zip, description, " +
+            "loan_number, property_address, property_city, property_state, property_zip, description, " +
             "source_page, source_snippet, confidence, raw_llm_json, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)";
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)";
         
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             for (PaymentRecord record : records) {
@@ -101,23 +102,24 @@ public class PaymentRecordRepository {
                 stmt.setString(13, record.getCurrency() != null ? record.getCurrency() : "USD");
                 stmt.setString(14, record.getPayerName());
                 stmt.setString(15, record.getPayeeName());
-                stmt.setString(16, record.getPropertyAddress());
-                stmt.setString(17, record.getPropertyCity());
-                stmt.setString(18, record.getPropertyState());
-                stmt.setString(19, record.getPropertyZip());
-                stmt.setString(20, record.getDescription());
-                stmt.setObject(21, record.getSourcePage());
-                stmt.setString(22, record.getSourceSnippet());
-                stmt.setBigDecimal(23, record.getConfidence());
+                stmt.setString(16, record.getLoanNumber());
+                stmt.setString(17, record.getPropertyAddress());
+                stmt.setString(18, record.getPropertyCity());
+                stmt.setString(19, record.getPropertyState());
+                stmt.setString(20, record.getPropertyZip());
+                stmt.setString(21, record.getDescription());
+                stmt.setObject(22, record.getSourcePage());
+                stmt.setString(23, record.getSourceSnippet());
+                stmt.setBigDecimal(24, record.getConfidence());
                 
                 String jsonString = record.getRawLlmJson() != null ? record.getRawLlmJson().toString() : null;
-                stmt.setString(24, jsonString);
+                stmt.setString(25, jsonString);
                 
                 // Convert Instant to java.sql.Timestamp for PostgreSQL
                 java.sql.Timestamp createdAtTs = record.getCreatedAt() != null ? 
                     java.sql.Timestamp.from(record.getCreatedAt()) : 
                     java.sql.Timestamp.from(Instant.now());
-                stmt.setTimestamp(25, createdAtTs);
+                stmt.setTimestamp(26, createdAtTs);
                 
                 stmt.addBatch();
             }
@@ -257,6 +259,7 @@ public class PaymentRecordRepository {
         record.setCurrency(rs.getString("currency"));
         record.setPayerName(rs.getString("payer_name"));
         record.setPayeeName(rs.getString("payee_name"));
+        record.setLoanNumber(rs.getString("loan_number"));
         
         // Property info
         record.setPropertyAddress(rs.getString("property_address"));

@@ -63,6 +63,9 @@ public class ExtractedPayment {
     
     @JsonProperty("confidence")
     private BigDecimal confidence;
+    
+    @JsonProperty("loan_number")
+    private String loanNumber;
 
     // Constructors
     public ExtractedPayment() {}
@@ -210,6 +213,14 @@ public class ExtractedPayment {
 
     public void setConfidence(BigDecimal confidence) {
         this.confidence = confidence;
+    }
+
+    public String getLoanNumber() {
+        return loanNumber;
+    }
+
+    public void setLoanNumber(String loanNumber) {
+        this.loanNumber = loanNumber;
     }
 
     @Override

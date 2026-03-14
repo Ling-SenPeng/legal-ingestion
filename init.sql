@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS payment_records (
 
   payer_name TEXT,
   payee_name TEXT,
+  loan_number VARCHAR(50),
 
   property_address TEXT,
   property_city VARCHAR(100),

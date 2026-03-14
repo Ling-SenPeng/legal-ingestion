@@ -283,6 +283,9 @@ public class PaymentExtractionPipeline {
                 // Party information
                 record.setPayerName(payment.getPayerName());
                 record.setPayeeName(payment.getPayeeName());
+                
+                // Loan information
+                record.setLoanNumber(payment.getLoanNumber());
 
                 // Property information
                 record.setPropertyAddress(payment.getPropertyAddress());

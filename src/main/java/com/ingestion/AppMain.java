@@ -3,7 +3,10 @@ package com.ingestion;
 import io.github.cdimascio.dotenv.Dotenv;
 import java.io.InputStream;
 import java.sql.DriverManager;
+import java.util.ArrayList;
 import java.util.Properties;
+import com.ingestion.entity.PdfDocument;
+import com.ingestion.repository.PdfDocumentRepository;
 import com.ingestion.service.payment.PaymentExtractionPipeline;
 
 /**
@@ -217,27 +220,33 @@ public class AppMain {
 	private static void runExtractPayments(String[] args) throws Exception {
 		System.out.println("=== Payment Extraction Command ===");
 
-		// Parse arguments: extract-payments <pdf_document_id> [--model model_name]
-		if (args.length < 2) {
-			System.err.println("Error: PDF document ID is required");
-			System.err.println("Usage: java AppMain extract-payments <pdf_id> [--model gpt-4o-mini]");
-			System.exit(1);
-		}
-
-		long pdfDocumentId;
-		try {
-			pdfDocumentId = Long.parseLong(args[1]);
-		} catch (NumberFormatException e) {
-			System.err.println("Error: PDF document ID must be a valid number");
-			System.exit(1);
-			return;
-		}
-
+		// Parse arguments: extract-payments [<pdf_document_id>] [--all] [--model model_name] [--status STATUS]
+		Long pdfDocumentId = null;
+		boolean processAll = false;
 		String modelOverride = null;
-		for (int i = 2; i < args.length; i++) {
-			if (args[i].equals("--model") && i + 1 < args.length) {
+		String statusFilter = null;
+
+		// Parse optional arguments
+		for (int i = 1; i < args.length; i++) {
+			if (args[i].equals("--all")) {
+				processAll = true;
+			} else if (args[i].equals("--model") && i + 1 < args.length) {
 				modelOverride = args[i + 1];
 				i++;
+			} else if (args[i].equals("--status") && i + 1 < args.length) {
+				statusFilter = args[i + 1];
+				i++;
+			} else if (!args[i].startsWith("--")) {
+				// Treat as PDF document ID
+				if (pdfDocumentId == null) {
+					try {
+						pdfDocumentId = Long.parseLong(args[i]);
+					} catch (NumberFormatException e) {
+						System.err.println("Error: PDF document ID must be a valid number");
+						System.exit(1);
+						return;
+					}
+				}
 			}
 		}
 
@@ -258,24 +267,122 @@ public class AppMain {
 				pipeline = PaymentExtractionPipeline.withDefaultOpenAi(dbConn);
 			}
 
-			// Process the PDF
-			System.out.println("Processing PDF document ID: " + pdfDocumentId);
-			PaymentExtractionPipeline.PaymentExtractionPipelineResult result = pipeline.processPdfDocument(pdfDocumentId);
+			// Determine which PDFs to process
+			java.util.List<PdfDocument> pdfsToProcess = new ArrayList<>();
 
-			// Display results
-			if (result.isSuccess()) {
-				System.out.println();
-				System.out.println("✓ Extraction completed successfully");
-				System.out.println("  Statements: " + (result.getExtractionRun() != null ? result.getExtractionRun().getStatementCount() : 0));
-				System.out.println("  Payments: " + result.getPaymentCount());
-				System.out.println("  Inserted: " + result.getInsertedCount());
-				if (result.getExtractionRun() != null && result.getExtractionRun().getIsScanned()) {
-					System.out.println("  Note: Scanned (OCR) document detected");
+			if (pdfDocumentId != null) {
+				// Process specific PDF
+				PdfDocument pdfDoc = PdfDocumentRepository.findById(dbConn, pdfDocumentId);
+				if (pdfDoc == null) {
+					System.err.println("Error: PDF document not found with ID: " + pdfDocumentId);
+					System.exit(1);
+					return;
+				}
+				pdfsToProcess.add(pdfDoc);
+			} else if (processAll) {
+				// Process all PDFs (or filter by status)
+				if (statusFilter != null) {
+					pdfsToProcess = PdfDocumentRepository.findByStatus(dbConn, statusFilter);
+					System.out.println("Processing all PDFs with status: " + statusFilter);
+				} else {
+					// Process only unprocessed PDFs (status: NEW or FAILED)
+					java.util.List<PdfDocument> newDocs = PdfDocumentRepository.findByStatus(dbConn, "NEW");
+					java.util.List<PdfDocument> failedDocs = PdfDocumentRepository.findByStatus(dbConn, "FAILED");
+					pdfsToProcess.addAll(newDocs);
+					pdfsToProcess.addAll(failedDocs);
+					System.out.println("Processing all unprocessed PDFs (status: NEW or FAILED)");
 				}
 			} else {
+				// No PDF ID and no --all flag: print usage and exit
+				System.err.println("Error: PDF document ID is required or use --all flag");
+				System.err.println();
+				System.err.println("Usage:");
+				System.err.println("  java AppMain extract-payments <pdf_id> [--model gpt-4o-mini]");
+				System.err.println("  java AppMain extract-payments --all [--status STATUS] [--model gpt-4o-mini]");
+				System.err.println();
+				System.err.println("Options:");
+				System.err.println("  <pdf_id>           : Process a specific PDF document by ID");
+				System.err.println("  --all              : Process all unprocessed PDFs (status: NEW or FAILED)");
+				System.err.println("  --status STATUS    : With --all, filter by status (e.g., NEW, FAILED, COMPLETED)");
+				System.err.println("  --model MODEL      : Override OpenAI model (default: gpt-4o-mini)");
+				System.exit(1);
+				return;
+			}
+
+			if (pdfsToProcess.isEmpty()) {
+				System.out.println("No PDFs found to process");
+				return;
+			}
+
+			// Process each PDF
+			System.out.println();
+			System.out.println("Found " + pdfsToProcess.size() + " PDF(s) to process");
+			System.out.println();
+
+			int successCount = 0;
+			int failureCount = 0;
+
+			for (int idx = 0; idx < pdfsToProcess.size(); idx++) {
+				PdfDocument pdfDoc = pdfsToProcess.get(idx);
+				System.out.println("[" + (idx + 1) + "/" + pdfsToProcess.size() + "] Processing PDF ID: " + pdfDoc.getId() + " - " + pdfDoc.getFileName());
+
+				try {
+					// Process the PDF
+					PaymentExtractionPipeline.PaymentExtractionPipelineResult result = pipeline.processPdfDocument(pdfDoc.getId());
+
+					// Display results
+					if (result.isSuccess()) {
+						System.out.println("  ✓ Success");
+						System.out.println("    Statements: " + (result.getExtractionRun() != null ? result.getExtractionRun().getStatementCount() : 0));
+						System.out.println("    Payments: " + result.getPaymentCount());
+						System.out.println("    Inserted: " + result.getInsertedCount());
+						if (result.getExtractionRun() != null && result.getExtractionRun().getIsScanned()) {
+							System.out.println("    Note: Scanned (OCR) document detected");
+						}
+
+						// Update PDF document status to COMPLETED
+						pdfDoc.setStatus("COMPLETED");
+						pdfDoc.setProcessedAt(java.time.Instant.now());
+						PdfDocumentRepository.update(dbConn, pdfDoc);
+						
+						successCount++;
+					} else {
+						System.out.println("  ✗ Failed: " + result.getErrorMessage());
+
+						// Update PDF document status to FAILED
+						pdfDoc.setStatus("FAILED");
+						pdfDoc.setErrorMsg(result.getErrorMessage());
+						pdfDoc.setProcessedAt(java.time.Instant.now());
+						PdfDocumentRepository.update(dbConn, pdfDoc);
+						
+						failureCount++;
+					}
+				} catch (Exception e) {
+					System.out.println("  ✗ Exception: " + e.getMessage());
+
+					// Update PDF document status to FAILED
+					pdfDoc.setStatus("FAILED");
+					pdfDoc.setErrorMsg(e.getMessage());
+					pdfDoc.setProcessedAt(java.time.Instant.now());
+					try {
+						PdfDocumentRepository.update(dbConn, pdfDoc);
+					} catch (Exception updateEx) {
+						System.err.println("    Warning: Failed to update PDF status in database: " + updateEx.getMessage());
+					}
+					
+					failureCount++;
+				}
+
 				System.out.println();
-				System.out.println("✗ Extraction failed");
-				System.out.println("  Error: " + result.getErrorMessage());
+			}
+
+			// Summary
+			System.out.println("=== Extraction Summary ===");
+			System.out.println("Total: " + pdfsToProcess.size());
+			System.out.println("Successful: " + successCount);
+			System.out.println("Failed: " + failureCount);
+
+			if (failureCount > 0) {
 				System.exit(1);
 			}
 		}
@@ -290,6 +397,7 @@ public class AppMain {
 		System.out.println("  mvn exec:java -Dexec.args=\"search --query \\\"your search\\\" [--topK 10]\"");
 		System.out.println("  mvn exec:java -Dexec.args=\"hybrid-search --query \\\"your search\\\" [--topK 10] [--vectorTopN 20] [--keywordTopN 20] [--alpha 0.7]\"");
 		System.out.println("  java AppMain extract-payments <pdf_id> [--model gpt-4o-mini]");
+		System.out.println("  java AppMain extract-payments --all [--status STATUS] [--model gpt-4o-mini]");
 		System.out.println();
 		System.out.println("Hybrid Search:");
 		System.out.println("  Combines vector similarity and keyword (full-text) search for legal documents.");
@@ -301,8 +409,16 @@ public class AppMain {
 		System.out.println("                    finalScore = alpha*vectorScore + (1-alpha)*keywordScore");
 		System.out.println("Payment Extraction:");
 		System.out.println("  Extracts payment records from PDF bank statements using OpenAI API.");
-		System.out.println("  <pdf_id>      : Document ID from pdf_documents table (required)");
+		System.out.println("  <pdf_id>      : Document ID from pdf_documents table (optional)");
+		System.out.println("  --all         : Process all unprocessed PDFs (status: NEW or FAILED)");
+		System.out.println("  --status      : Filter by status when using --all (e.g., NEW, FAILED, COMPLETED)");
 		System.out.println("  --model       : Override OpenAI model (default: gpt-4o-mini)");
+		System.out.println();
+		System.out.println("PDF Status Values:");
+		System.out.println("  NEW           : Not yet processed");
+		System.out.println("  PROCESSING    : Currently processing (for ingest command)");
+		System.out.println("  COMPLETED     : Successfully processed");
+		System.out.println("  FAILED        : Processing failed");
 		System.out.println();
 		System.out.println("Environment Variables:");
 		System.out.println("  OPENAI_API_KEY - Required for embed-missing, search, hybrid-search, and extract-payments commands");

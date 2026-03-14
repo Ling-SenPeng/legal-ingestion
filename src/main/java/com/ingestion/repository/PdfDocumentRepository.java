@@ -90,10 +90,20 @@ public class PdfDocumentRepository {
             stmt.setString(2, doc.getFilePath());
             stmt.setString(3, doc.getStatus());
             stmt.setString(4, doc.getErrorMsg());
-            stmt.setObject(5, doc.getProcessedAt());
+            
+            // Convert Instant to java.sql.Timestamp for processed_at
+            java.sql.Timestamp processedAtTs = doc.getProcessedAt() != null ? 
+                java.sql.Timestamp.from(doc.getProcessedAt()) : null;
+            stmt.setObject(5, processedAtTs);
+            
             stmt.setString(6, doc.getPaymentExtractionStatus());
             stmt.setString(7, doc.getPaymentExtractionErrorMsg());
-            stmt.setObject(8, doc.getPaymentExtractionCompletedAt());
+            
+            // Convert Instant to java.sql.Timestamp for payment_extraction_completed_at
+            java.sql.Timestamp paymentCompletedAtTs = doc.getPaymentExtractionCompletedAt() != null ? 
+                java.sql.Timestamp.from(doc.getPaymentExtractionCompletedAt()) : null;
+            stmt.setObject(8, paymentCompletedAtTs);
+            
             stmt.setLong(9, doc.getId());
             stmt.executeUpdate();
         }
